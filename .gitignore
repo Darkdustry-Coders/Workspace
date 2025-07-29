@@ -1,0 +1,11 @@
+/.cache
+/.build
+/.run
+/.bin
+/Cargo.toml
+/settings.gradle
+/.opt
+/.env
+/mprocs.log
+.gradle
+/build

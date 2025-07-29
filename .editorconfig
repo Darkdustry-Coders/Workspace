@@ -1,0 +1,12 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+
+# TODO: smh make java/kotlin styling not suck
+
+[{*.kt,*.kts}]
+ij_kotlin_name_count_to_use_star_import = 50
+ij_kotlin_name_count_to_use_star_import_for_members = 50
+ij_kotlin_else_on_new_line = false
