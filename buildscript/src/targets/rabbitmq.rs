@@ -2,7 +2,7 @@ use std::{
     fs::{self, File},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 
 use crate::util::{download, find_executable, is_executable, untar_xz};
