@@ -173,6 +173,15 @@ fn main() {
                 fs::create_dir_all(".run").unwrap();
 
                 targets.run_init_all(&mut params);
+
+                if let Some(rabbitmq) = targets.rabbitmq.as_ref().map(|x| x.url()) {
+                    fs::write(
+                        ".run/globalConfig.toml",
+                        format!("serverIp = \"127.0.0.1\"\nrabbitMqUrl = {rabbitmq:?}"),
+                    )
+                    .unwrap();
+                }
+
                 targets.run_all(&mut params);
 
                 if !targets.mprocs.as_mut().unwrap().wait() {

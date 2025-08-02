@@ -62,6 +62,14 @@ impl TargetImpl for Impl {
             root.join("config/maps/testmap.msav"),
         )
         .unwrap();
+        fs::write(
+            root.join("config/corePlugin.toml"),
+            format!(
+                "serverName = \"forts\"\nglobalConfigPath = {:?}",
+                params.root.join(".run/globalConfig.toml")
+            ),
+        )
+        .unwrap();
 
         let port = params.next_port();
 

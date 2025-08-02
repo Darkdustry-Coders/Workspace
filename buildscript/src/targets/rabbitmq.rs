@@ -22,13 +22,15 @@ impl Impl {
             port: 0,
         }
     }
+
+    pub fn url(&self) -> String {
+        format!("amqp://guest:guest@localhost:{}/%2F", self.port)
+    }
 }
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, _: &mut super::BuildParams) {}
 
-    fn run_init(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {}
-
-    fn run(&mut self, mut deps: super::Targets<'_>, params: &mut super::RunParams) {
+    fn run_init(&mut self, _: super::Targets<'_>, params: &mut super::RunParams) {
         self.port = params.next_port();
 
         let rabbitmq_root = params.root.join(".run/rabbitmq");
@@ -39,7 +41,10 @@ impl TargetImpl for Impl {
             .write_all(format!("listeners.tcp.default = 127.0.0.1:{}\n", self.port).as_bytes())
             .unwrap();
         config.flush().unwrap();
-        drop(config);
+    }
+
+    fn run(&mut self, mut deps: super::Targets<'_>, params: &mut super::RunParams) {
+        let rabbitmq_root = params.root.join(".run/rabbitmq");
 
         let mut command = Command::new(self.rabbitmq_home.join("sbin").join("rabbitmq-server"));
         command.arg("start");

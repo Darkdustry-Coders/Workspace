@@ -9,3 +9,5 @@
 /mprocs.log
 .gradle
 /build
+/.settings
+/.project

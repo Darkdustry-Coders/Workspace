@@ -2,6 +2,10 @@
 
 Workspace for testing and developing Mindurka.
 
+## Using the workspace
+
+Before doing anything, run the wrapper with `./b`.
+
 ## Defining targets
 
 Targets are defined by creating a new file in `buildscript/src/targets/<name>.rs`

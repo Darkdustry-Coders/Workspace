@@ -7,7 +7,7 @@ dependencyResolutionManagement {
             def kotlin_ktoml = "0.7.0"
             def kotlin_datetime = "0.6.2"
             def kotlin_coro = "1.10.2"
-            def rabbitmq_aqmp = "5.25.0"
+            def rabbitmq_aqmp = "5.26.0";
             def surrealdb = "0.2.1"
             def mindustry = "v146"
             def jline = "3.21.0"
