@@ -2,7 +2,7 @@ use std::{
     fs::{self, File},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Command,
 };
 
 use crate::util::{download, find_executable, is_executable, untar_xz};
@@ -14,12 +14,14 @@ static URL: &str = "https://github.com/rabbitmq/rabbitmq-server/releases/downloa
 pub struct Impl {
     rabbitmq_home: PathBuf,
     port: u16,
+    management_port: u16,
 }
 impl Impl {
     fn new(rabbitmq_home: PathBuf) -> Self {
         Self {
             rabbitmq_home,
             port: 0,
+            management_port: 0,
         }
     }
 
@@ -32,13 +34,27 @@ impl TargetImpl for Impl {
 
     fn run_init(&mut self, _: super::Targets<'_>, params: &mut super::RunParams) {
         self.port = params.next_port();
+        self.management_port = params.next_port();
 
         let rabbitmq_root = params.root.join(".run/rabbitmq");
         fs::create_dir_all(&rabbitmq_root).unwrap();
 
         let mut config = BufWriter::new(File::create(rabbitmq_root.join("rabbitmq.conf")).unwrap());
         config
-            .write_all(format!("listeners.tcp.default = 127.0.0.1:{}\n", self.port).as_bytes())
+            .write_all(
+                format!(
+                    "listeners.tcp.default = 127.0.0.1:{}\nlog.file.level = debug\nmanagement.tcp.port = {}\n",
+                    self.port, self.management_port
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        config.flush().unwrap();
+
+        let mut config =
+            BufWriter::new(File::create(rabbitmq_root.join("enabled-plugins")).unwrap());
+        config
+            .write_all("[rabbitmq_management].".as_bytes())
             .unwrap();
         config.flush().unwrap();
     }
@@ -47,8 +63,12 @@ impl TargetImpl for Impl {
         let rabbitmq_root = params.root.join(".run/rabbitmq");
 
         let mut command = Command::new(self.rabbitmq_home.join("sbin").join("rabbitmq-server"));
-        command.arg("start");
+        command.arg(rabbitmq_root.join("start"));
         command.env("RABBITMQ_CONFIG_FILE", rabbitmq_root.join("rabbitmq.conf"));
+        command.env(
+            "RABBITMQ_ENABLED_PLUGINS_FILE",
+            rabbitmq_root.join("enabled-plugins"),
+        );
         command.env("RABBITMQ_PID_FILE", rabbitmq_root.join("rabbitmq.pid"));
         command.env("RABBITMQ_LOG_BASE", rabbitmq_root.join("log"));
         command.env("RABBITMQ_MNESIA_BASE", rabbitmq_root.join("db"));

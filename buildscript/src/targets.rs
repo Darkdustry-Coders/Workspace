@@ -1,7 +1,6 @@
 use std::{
     any::Any,
     collections::HashMap,
-    env::current_dir,
     ffi::{OsStr, OsString},
     io::{Write, stderr, stdin},
     ops::{Deref, DerefMut},
@@ -10,9 +9,10 @@ use std::{
     str::FromStr,
 };
 
-use dotenvy::var;
-
-use crate::args::{BuildArgs, EnvTy, GitBackend, MindustryVersion};
+use crate::{
+    args::{BuildArgs, EnvTy, GitBackend, MindustryVersion},
+    util::current_dir,
+};
 
 /// List of target flags.
 ///
@@ -202,7 +202,7 @@ impl InitParams {
             mindustry_version: args.mindustry_version,
             rust_workspace_members: Default::default(),
             java_workspace_members: Default::default(),
-            root: current_dir().unwrap(),
+            root: current_dir().to_path_buf(),
         }
     }
 }
@@ -213,15 +213,17 @@ pub struct BuildParams {
     pub env: HashMap<OsString, OsString>,
     pub path: Vec<PathBuf>,
     pub root: PathBuf,
+    pub java_stacktrace: bool,
 }
 impl BuildParams {
-    pub fn new(params: InitParams) -> Self {
+    pub fn new(params: InitParams, args: &BuildArgs) -> Self {
         Self {
             git_backend: params.git_backend,
             mindustry_version: params.mindustry_version,
             env: Default::default(),
             path: Default::default(),
             root: params.root,
+            java_stacktrace: args.java_stackstrace,
         }
     }
 
@@ -250,6 +252,25 @@ impl BuildParams {
         }
         cmd.envs(&self.env);
         cmd.env("PATH", path);
+        cmd
+    }
+
+    pub fn gradle(&mut self) -> Command {
+        let gradle = {
+            #[cfg(unix)]
+            {
+                current_dir().join("gradlew")
+            }
+            #[cfg(target_os = "windows")]
+            {
+                current_dir().join("gradlew.bat")
+            }
+        };
+
+        let mut cmd = self.cmd(gradle);
+        if self.java_stacktrace {
+            cmd.arg("--stacktrace");
+        }
         cmd
     }
 }
@@ -496,4 +517,6 @@ targets! {
     coreplugin: CorePlugin;
     /// Forts plugin.
     forts: Forts;
+    /// Hub plugin.
+    hub: Hub;
 }

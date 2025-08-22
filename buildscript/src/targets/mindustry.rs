@@ -1,12 +1,11 @@
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},
-    process::Command,
 };
 
-use crate::util::{self, download};
+use crate::util::download;
 
-use super::{RunParams, TargetImpl, TargetImplStatic, Targets};
+use super::{TargetImpl, TargetImplStatic};
 
 pub struct Impl {
     path: PathBuf,

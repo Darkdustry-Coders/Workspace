@@ -20,6 +20,8 @@ pub struct BuildArgs {
     pub git_backend: GitBackend,
 
     pub ports_start: u16,
+
+    pub java_stackstrace: bool,
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
@@ -91,6 +93,7 @@ pub fn print_help() {
     eprintln!("\t--run              - run targets");
     eprintln!("\t--clean            - clean temporary files");
     eprintln!("\t--pack             - build a package");
+    eprintln!("\t--stacktrace       - pass '--stacktrace' to gradle");
     eprintln!();
     eprintln!("Available targets:");
     for x in TARGET_NAMES {
@@ -159,6 +162,9 @@ pub fn args() -> Args {
                     match x {
                         "ssh" => {
                             build.git_backend = GitBackend::Ssh;
+                        }
+                        "stacktrace" => {
+                            build.java_stackstrace = true;
                         }
                         "mindustry" => {}
                         x => errors.push(format!("unknown option {:?}", format!("--{x}"))),

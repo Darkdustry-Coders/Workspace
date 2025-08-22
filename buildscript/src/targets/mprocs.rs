@@ -84,7 +84,7 @@ impl TargetImpl for Impl {
                 .unwrap(),
         );
         self.port = port;
-        sleep(Duration::from_millis(10));
+        sleep(Duration::from_millis(100));
     }
 }
 impl TargetImplStatic for Impl {

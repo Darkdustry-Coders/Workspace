@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use crate::util::{current_dir, gradle};
+use crate::util::current_dir;
 
 use super::{Target, TargetImpl, TargetImplStatic};
 
@@ -30,9 +30,12 @@ impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
         // On CorePlugin side it should copy resulting jar into `.bin/CorePlugin.jar`.
         if !params
-            .cmd(gradle())
+            .gradle()
             .arg(":coreplugin:build")
             .arg(":coreplugin:publishAllPublicationsToMavenRepository")
+            .arg(":coreplugin:processor:publishAllPublicationsToMavenRepository")
+            .arg(":coreplugin:buildExtras:publishAllPublicationsToMavenRepository")
+            .arg(":coreplugin:annotations:publishAllPublicationsToMavenRepository")
             .status()
             .unwrap()
             .success()

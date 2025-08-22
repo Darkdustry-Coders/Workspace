@@ -131,7 +131,7 @@ fn main() {
             })
             .unwrap();
 
-            let mut params = BuildParams::new(params);
+            let mut params = BuildParams::new(params, &build);
 
             targets.build_all(&mut params);
 

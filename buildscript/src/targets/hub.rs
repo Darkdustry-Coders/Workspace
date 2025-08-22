@@ -19,7 +19,7 @@ impl Impl {
     fn new(path: PathBuf) -> Self {
         Self {
             repo: path,
-            path: current_dir().join(".bin/Forts.jar"),
+            path: current_dir().join(".bin/LightweightHub.jar"),
             command: None,
         }
     }
@@ -30,20 +30,19 @@ impl Impl {
 }
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
-        // On Forts side it should copy resulting jar into `.bin/Forts.jar`.
         if !params
             .gradle()
-            .arg(":forts:build")
+            .arg(":hub:build")
             .status()
             .unwrap()
             .success()
         {
-            panic!("building Forts failed");
+            panic!("building LightweightHub failed");
         }
     }
 
     fn run_init(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
-        let root = params.root.join(".run/forts");
+        let root = params.root.join(".run/hub");
         fs::create_dir_all(root.join("config/mods")).unwrap();
         fs::create_dir_all(root.join("config/maps")).unwrap();
 
@@ -53,19 +52,19 @@ impl TargetImpl for Impl {
         )
         .unwrap();
         util::symlink_file(
-            params.root.join(".bin/Forts.jar"),
-            root.join("config/mods/Forts.jar"),
+            params.root.join(".bin/LightweightHub.jar"),
+            root.join("config/mods/LightweightHub.jar"),
         )
         .unwrap();
         fs::copy(
-            params.root.join("forts/assets/testmap.msav"),
+            params.root.join("hub/assets/testmap.msav"),
             root.join("config/maps/testmap.msav"),
         )
         .unwrap();
         fs::write(
             root.join("config/corePlugin.toml"),
             format!(
-                "serverName = \"forts\"\nglobalConfigPath = {:?}",
+                "serverName = \"hub\"\nglobalConfigPath = {:?}",
                 params.root.join(".run/globalConfig.toml")
             ),
         )
@@ -97,7 +96,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let commands = "host Forts_v1.5 attack";
+            let commands = "host Protohub survival";
             contents.push(4);
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
@@ -114,11 +113,10 @@ impl TargetImpl for Impl {
     }
 
     fn run(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
-        deps.mprocs.as_ref().unwrap().spawn_task(
-            params,
-            &mut self.command.take().unwrap(),
-            "forts",
-        );
+        deps.mprocs
+            .as_ref()
+            .unwrap()
+            .spawn_task(params, &mut self.command.take().unwrap(), "hub");
     }
 }
 impl TargetImplStatic for Impl {
@@ -139,12 +137,12 @@ impl TargetImplStatic for Impl {
         _: super::Targets<'_>,
         params: &mut super::InitParams,
     ) -> Option<Self> {
-        if read_dir("forts").is_err() {
+        if read_dir("hub").is_err() {
             return None;
         }
 
-        params.java_workspace_members.push("forts".into());
-        Some(Self::new(fs::canonicalize("forts").unwrap()))
+        params.java_workspace_members.push("hub".into());
+        Some(Self::new(fs::canonicalize("hub").unwrap()))
     }
 
     fn initialize_local(
@@ -154,8 +152,12 @@ impl TargetImplStatic for Impl {
     ) -> Self {
         if !Command::new("git")
             .arg("clone")
-            .arg(params.git_backend.repo_url("Darkdustry-Coders/Forts"))
-            .arg(params.root.join("forts"))
+            .arg(
+                params
+                    .git_backend
+                    .repo_url("Darkdustry-Coders/LightweightHub"),
+            )
+            .arg(params.root.join("hub"))
             .status()
             .unwrap()
             .success()
@@ -163,6 +165,6 @@ impl TargetImplStatic for Impl {
             panic!("failed to fetch repo");
         }
 
-        Self::new(fs::canonicalize("forts").unwrap())
+        Self::new(fs::canonicalize("hub").unwrap())
     }
 }

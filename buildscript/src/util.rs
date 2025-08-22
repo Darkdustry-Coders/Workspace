@@ -270,17 +270,3 @@ pub fn symlink_file(source: impl AsRef<Path>, dest: impl AsRef<Path>) -> std::io
     std::os::unix::fs::symlink(source, dest)
 }
 // TODO: Implement for Windows
-
-///
-#[cfg(unix)]
-pub fn gradle() -> PathBuf {
-    use std::env::current_dir;
-
-    current_dir().unwrap().join("gradlew")
-}
-#[cfg(windows)]
-pub fn gradle() -> PathBuf {
-    use std::env::current_dir;
-
-    current_dir().unwrap().join("gradlew.bat")
-}
