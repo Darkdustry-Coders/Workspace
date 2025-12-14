@@ -11,3 +11,4 @@
 /build
 /.settings
 /.project
+/erl_crash.dump

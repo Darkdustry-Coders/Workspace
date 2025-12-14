@@ -5,9 +5,10 @@ use crate::targets::TARGET_NAMES;
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub enum MindustryVersion {
     BleedingEdge,
+    #[default]
+    V153,
     V150,
     V149,
-    #[default]
     V146,
 }
 

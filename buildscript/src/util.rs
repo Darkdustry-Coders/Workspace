@@ -82,6 +82,16 @@ where
     }
 }
 
+/// Obtain an executable path.
+///
+/// This will insert a `.exe` on Windows.
+#[cfg(unix)]
+#[macro_export]
+macro_rules! exe_path {
+    ($expr:expr) => {
+        $expr
+    };
+}
 #[cfg(unix)]
 pub fn is_executable(path: impl AsRef<Path>) -> bool {
     let path = path.as_ref();
@@ -268,5 +278,16 @@ pub fn untar_xz(archive: impl AsRef<Path>, path: impl AsRef<Path>, skip_segments
 #[cfg(unix)]
 pub fn symlink_file(source: impl AsRef<Path>, dest: impl AsRef<Path>) -> std::io::Result<()> {
     std::os::unix::fs::symlink(source, dest)
+}
+
+/// Obtain an executable path.
+///
+/// This will insert a `.exe` on Windows.
+#[cfg(windows)]
+#[macro_export]
+macro_rules! exe_path {
+    ($expr:expr) => {
+        concat!($expr, ".exe")
+    };
 }
 // TODO: Implement for Windows

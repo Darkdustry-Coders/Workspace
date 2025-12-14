@@ -27,6 +27,10 @@ impl TargetImpl for Impl {
     }
 }
 impl TargetImplStatic for Impl {
+    fn flags() -> super::TargetFlags {
+        super::TargetFlags::new().always_local()
+    }
+
     fn depends(list: &mut super::TargetList) {
         list.set_depend(super::Target::Java);
     }
@@ -48,6 +52,7 @@ impl TargetImplStatic for Impl {
             crate::args::MindustryVersion::V146 => "server-v146.jar",
             crate::args::MindustryVersion::V149 => "server-v149.jar",
             crate::args::MindustryVersion::V150 => "server-v150.jar",
+            crate::args::MindustryVersion::V153 => "server-v153.jar",
             crate::args::MindustryVersion::BleedingEdge => "server-be.jar",
         });
 
@@ -68,7 +73,16 @@ impl TargetImplStatic for Impl {
                 let file = Path::new(".cache/tools/mindustry/server-v146.jar");
                 eprintln!("Downloading Mindustry (v146)");
                 download(
-                    "https://github.com/5GameMaker/MindustryHotfixv7/releases/download/v146.7/server-release.jar",
+                    "https://github.com/5GameMaker/MindustryHotfixv7/releases/download/v146.8/server-release.jar",
+                    file,
+                );
+                Self::new(fs::canonicalize(file).unwrap())
+            }
+            crate::args::MindustryVersion::V153 => {
+                let file = Path::new(".cache/tools/mindustry/server-v153.jar");
+                eprintln!("Downloading Mindustry (v153)");
+                download(
+                    "https://github.com/Anuken/Mindustry/releases/download/v153/server-release.jar",
                     file,
                 );
                 Self::new(fs::canonicalize(file).unwrap())

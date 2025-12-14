@@ -39,6 +39,27 @@ pub struct TargetFlags {
     /// A target is to be removed in the future.
     pub deprecated: bool,
 }
+impl TargetFlags {
+    #[allow(unused)]
+    pub const fn new() -> TargetFlags {
+        TargetFlags {
+            always_local: false,
+            deprecated: false,
+        }
+    }
+
+    #[allow(unused)]
+    pub const fn always_local(mut self) -> TargetFlags {
+        self.always_local = true;
+        self
+    }
+
+    #[allow(unused)]
+    pub const fn deprecated(mut self) -> TargetFlags {
+        self.deprecated = true;
+        self
+    }
+}
 impl Default for TargetFlags {
     fn default() -> Self {
         Self {
@@ -380,6 +401,7 @@ macro_rules! targets {
             $(pub $name: Option<BorrowedMut<'a, $name::Impl>>,)*
         }
         impl<'a> Targets<'a> {
+            #[allow(unused)]
             pub fn target(&self, target: Target) -> Option<&dyn TargetImpl> {
                 match target {$(
                     Target::$enumname => self.$name.as_ref().map(|x| x.as_ref() as &dyn TargetImpl),
@@ -441,7 +463,7 @@ macro_rules! targets {
                                 break 'a Some(BorrowedMut::new_owned(x));
                             }
 
-                            if env == EnvTy::Host {
+                            if env == EnvTy::Host && !$name::Impl::flags().always_local {
                                 eprintln!();
                                 eprintln!("Could not find tool {:?}", stringify!($name));
                                 eprintln!();

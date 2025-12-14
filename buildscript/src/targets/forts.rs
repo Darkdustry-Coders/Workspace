@@ -1,6 +1,6 @@
 use std::{
     fs::{self, read_dir},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::Command,
 };
 
@@ -11,7 +11,9 @@ use super::{Target, TargetImpl, TargetImplStatic};
 // TODO: Download if enabled status is `Depend` instead of `Build`.
 
 pub struct Impl {
+    #[allow(unused)]
     repo: PathBuf,
+    #[allow(unused)]
     path: PathBuf,
     command: Option<Command>,
 }
@@ -22,10 +24,6 @@ impl Impl {
             path: current_dir().join(".bin/Forts.jar"),
             command: None,
         }
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
     }
 }
 impl TargetImpl for Impl {

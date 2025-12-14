@@ -1,20 +1,31 @@
 use std::{
-    env::current_dir,
     fs,
-    io::{Read, Write},
-    path::PathBuf,
-    process::{Command, Stdio},
+    path::{Path, PathBuf},
+    process::Command,
 };
 
-use crate::util::{find_executable, is_executable};
+use crate::{
+    exe_path,
+    util::{download, find_executable, is_executable},
+};
 
 use super::{RunParams, TargetEnabled, TargetFlags, TargetImpl, TargetImplStatic, Targets};
+
+static URL: &str = if cfg!(target_os = "linux") {
+    "https://github.com/surrealdb/surrealdb/releases/download/v2.4.0/surreal-v2.4.0.linux-amd64.tgz"
+} else {
+    "https://github.com/surrealdb/surrealdb/releases/download/v2.4.0/surreal-v2.4.0.windows-amd64.exe"
+};
 
 pub struct Impl {
     surreal: PathBuf,
     port: u16,
 }
-impl Impl {}
+impl Impl {
+    fn new(surreal: PathBuf) -> Self {
+        Self { surreal, port: 0 }
+    }
+}
 impl TargetImpl for Impl {
     fn build(&mut self, _: Targets<'_>, _: &mut super::BuildParams) {
         // STUB: This target is not compiled from source.
@@ -33,7 +44,7 @@ impl TargetImpl for Impl {
     fn run(&mut self, mut deps: Targets<'_>, params: &mut RunParams) {
         deps.mprocs.as_mut().unwrap().spawn_task(
             params,
-            Command::new(self.surreal.join("surreal"))
+            Command::new(self.surreal.join(exe_path!("surreal")))
                 .arg("start")
                 .arg(format!(
                     "surrealkv://{}",
@@ -64,7 +75,7 @@ impl TargetImplStatic for Impl {
         _: Targets<'_>,
         _: &mut super::InitParams,
     ) -> Option<Self> {
-        if is_executable(".cache/tools/surrealdb/surreal") {
+        if is_executable(exe_path!(".cache/tools/surrealdb/surreal")) {
             Some(Self {
                 surreal: fs::canonicalize(".cache/tools/surrealdb").unwrap(),
                 port: 0,
@@ -75,44 +86,69 @@ impl TargetImplStatic for Impl {
     }
     #[allow(unreachable_code)]
     fn initialize_local(_: TargetEnabled, _: Targets<'_>, _: &mut super::InitParams) -> Self {
-        #[cfg(unix)]
+        #[cfg(target_os = "linux")]
         {
-            eprintln!("Downloading SurrealDB");
+            use crate::util::untar_gz;
 
-            let mut resp = ureq::get("https://install.surrealdb.com/").call().unwrap();
-            let mut reader = resp.body_mut().as_reader();
-            let mut buf = [0; 16384];
-            let mut process = Command::new("sh")
-                .arg("-s")
-                .arg(current_dir().unwrap().join(".cache/tools/surrealdb"))
-                .stdin(Stdio::piped())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()
-                .unwrap();
-            let mut stdin = process.stdin.take().unwrap();
-            loop {
-                let len = reader.read(&mut buf).unwrap();
-                if len == 0 {
-                    break;
-                }
-                stdin.write(&buf[0..len]).unwrap();
-            }
-            stdin.flush().unwrap();
-            drop(stdin);
-            let code = process.wait().unwrap();
-            if !code.success() {
-                panic!("surrealdb installer exited with code {code}");
-            }
+            let archive = ".cache/tools/surrealdb/archive.tar.xz";
+            let dir = Path::new(archive).parent().unwrap();
+            fs::create_dir_all(dir).unwrap();
+            download(URL, archive);
+            untar_gz(archive, dir, 1);
+            fs::remove_file(archive).ok();
 
-            return Self {
-                surreal: fs::canonicalize(".cache/tools/surrealdb").unwrap(),
-                port: 0,
-            };
+            return Self::new(fs::canonicalize(dir).unwrap());
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let exe = ".cache/tools/surrealdb/surreal.exe";
+            let dir = Path::new(archive).parent().unwrap();
+            fs::create_dir_all(dir).unwrap();
+            download(URL, archive);
+
+            return Self::new(fs::canonicalize(dir).unwrap());
         }
 
-        // TODO: Implement on Windows.
-
         todo!();
+
+        // #[cfg(unix)]
+        // {
+        //     eprintln!("Downloading SurrealDB");
+
+        //     let mut resp = ureq::get("https://install.surrealdb.com/").call().unwrap();
+        //     let mut reader = resp.body_mut().as_reader();
+        //     let mut buf = [0; 16384];
+        //     let mut process = Command::new("sh")
+        //         .arg("-s")
+        //         .arg(current_dir().unwrap().join(".cache/tools/surrealdb"))
+        //         .stdin(Stdio::piped())
+        //         .stdout(Stdio::inherit())
+        //         .stderr(Stdio::inherit())
+        //         .spawn()
+        //         .unwrap();
+        //     let mut stdin = process.stdin.take().unwrap();
+        //     loop {
+        //         let len = reader.read(&mut buf).unwrap();
+        //         if len == 0 {
+        //             break;
+        //         }
+        //         stdin.write(&buf[0..len]).unwrap();
+        //     }
+        //     stdin.flush().unwrap();
+        //     drop(stdin);
+        //     let code = process.wait().unwrap();
+        //     if !code.success() {
+        //         panic!("surrealdb installer exited with code {code}");
+        //     }
+
+        //     return Self {
+        //         surreal: fs::canonicalize(".cache/tools/surrealdb").unwrap(),
+        //         port: 0,
+        //     };
+        // }
+
+        // // TODO: Implement on Windows.
+
+        // todo!();
     }
 }
