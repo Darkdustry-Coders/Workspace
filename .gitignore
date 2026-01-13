@@ -12,3 +12,4 @@
 /.settings
 /.project
 /erl_crash.dump
+/assets/shared.settings.gradle

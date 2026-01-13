@@ -6,6 +6,7 @@ use crate::targets::TARGET_NAMES;
 pub enum MindustryVersion {
     BleedingEdge,
     #[default]
+    V154,
     V153,
     V150,
     V149,

@@ -2,7 +2,7 @@
 
 use std::{
     fs::{self, File, metadata},
-    io::{IsTerminal, Read, Write, stderr},
+    io::{self, IsTerminal, Read, Write, stderr},
     ops::{Div, Mul},
     path::{Path, PathBuf},
     process::Command,
@@ -131,6 +131,35 @@ pub fn find_executable(cmd: impl AsRef<std::ffi::OsStr>) -> Option<PathBuf> {
     }
 
     None
+}
+
+pub fn write_if_diff<P: AsRef<Path>, S: AsRef<[u8]>>(path: P, data: S) -> io::Result<()> {
+    let path = path.as_ref();
+    let mut data = data.as_ref();
+
+    if match File::open(path) {
+        Ok(mut file) => 'a: loop {
+            let mut buf = [0; 8192];
+            match file.read(&mut buf) {
+                Ok(0) => break true,
+                Err(_) => break false,
+                Ok(l) => {
+                    if l >= data.len() {
+                        break 'a false;
+                    }
+                    if &buf[0..l] != &data[0..l] {
+                        break 'a false;
+                    }
+                    data = &data[l..];
+                }
+            }
+        },
+        Err(_) => false,
+    } {
+        return Ok((()));
+    }
+
+    fs::write(path, data)
 }
 
 pub fn download(url: &str, path: impl AsRef<Path>) {

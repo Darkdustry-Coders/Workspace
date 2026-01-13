@@ -541,4 +541,6 @@ targets! {
     forts: Forts;
     /// Hub plugin.
     hub: Hub;
+
+    hexed: Hexed;
 }

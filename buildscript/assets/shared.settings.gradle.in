@@ -9,7 +9,7 @@ dependencyResolutionManagement {
             def kotlin_coro = "1.10.2"
             def rabbitmq_aqmp = "5.26.0";
             def surrealdb = "0.2.1"
-            def mindustry = "v146"
+            def mindustry = "MINDUSTRY_VERSION"
             def jline = "3.21.0"
             def jansi = "2.4.2"
 
@@ -28,9 +28,9 @@ dependencyResolutionManagement {
             library("kotlin-ksp", "com.google.devtools.ksp", "symbol-processing-api").version("$kotlin-$kotlin_ksp")
             library("kotlin-coro", "org.jetbrains.kotlinx", "kotlinx-coroutines-core").version(kotlin_coro)
 
-            library("mindustry-arc", "com.github.Anuken.Arc", "arc-core").version(mindustry)
-            library("mindustry-core", "com.github.Anuken.Mindustry", "core").version(mindustry)
-            library("mindustry-server", "com.github.Anuken.Mindustry", "server").version(mindustry)
+            library("mindustry-arc", "MINDUSTRY_PKG_ARC", "arc-core").version(mindustry)
+            library("mindustry-core", "MINDUSTRY_PKG_MINDUSTRY", "core").version(mindustry)
+            library("mindustry-server", "MINDUSTRY_PKG_MINDUSTRY", "server").version(mindustry)
 
             library("rabbitmq-amqp", "com.rabbitmq", "amqp-client").version(rabbitmq_aqmp)
             library("surrealdb", "com.surrealdb", "surrealdb").version(surrealdb)
