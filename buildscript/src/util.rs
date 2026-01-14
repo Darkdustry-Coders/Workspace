@@ -141,7 +141,7 @@ pub fn write_if_diff<P: AsRef<Path>, S: AsRef<[u8]>>(path: P, data: S) -> io::Re
         Ok(mut file) => 'a: loop {
             let mut buf = [0; 8192];
             match file.read(&mut buf) {
-                Ok(0) => break true,
+                Ok(0) => break buf.is_empty(),
                 Err(_) => break false,
                 Ok(l) => {
                     if l >= data.len() {

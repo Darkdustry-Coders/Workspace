@@ -1,4 +1,4 @@
-use std::process::exit;
+use std::{process::exit, str::FromStr};
 
 use crate::targets::TARGET_NAMES;
 
@@ -11,6 +11,21 @@ pub enum MindustryVersion {
     V150,
     V149,
     V146,
+}
+impl FromStr for MindustryVersion {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "be" => Ok(MindustryVersion::BleedingEdge),
+            "v154" => Ok(MindustryVersion::V154),
+            "v153" => Ok(MindustryVersion::V153),
+            "v150" => Ok(MindustryVersion::V150),
+            "v149" => Ok(MindustryVersion::V149),
+            "v146" => Ok(MindustryVersion::V146),
+            _ => Err(()),
+        }
+    }
 }
 
 /// Command line parameters for build mode.
@@ -91,7 +106,7 @@ pub fn print_help() {
     eprintln!("\t--ssh              - use ssh instead of https when pulling repos");
     eprintln!();
     eprintln!("Extra params for build:");
-    eprintln!("\t--mindustry [VER]  - set mindustry version (v7 by default)");
+    eprintln!("\t--mindustry [VER]  - set mindustry version (v154 by default)");
     eprintln!("\t--run              - run targets");
     eprintln!("\t--clean            - clean temporary files");
     eprintln!("\t--pack             - build a package");
@@ -168,7 +183,17 @@ pub fn args() -> Args {
                         "stacktrace" => {
                             build.java_stackstrace = true;
                         }
-                        "mindustry" => {}
+                        "mindustry" => {
+                            if let Some(x) = argv.next() {
+                                if let Ok(x) = MindustryVersion::from_str(&x) {
+                                    build.mindustry_version = x;
+                                } else {
+                                    errors.push(format!("--mindustry: invalid argument {x:?}"));
+                                }
+                            } else {
+                                errors.push("--mindustry: no value specified".to_string());
+                            }
+                        }
                         x => errors.push(format!("unknown option {:?}", format!("--{x}"))),
                     }
                 } else if let Some(x) = x.strip_prefix("-") {
