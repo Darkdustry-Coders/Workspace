@@ -62,7 +62,7 @@ impl TargetImpl for Impl {
         fs::write(
             root.join("config/corePlugin.toml"),
             format!(
-                "serverName = \"hub\"\nglobalConfigPath = {:?}",
+                "serverName = \"hub\"\ngamemode = \"hub\"\nglobalConfigPath = {:?}",
                 params.root.join(".run/globalConfig.toml")
             ),
         )

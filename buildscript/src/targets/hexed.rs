@@ -29,13 +29,7 @@ impl Impl {
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
         // On Hexed side it should copy resulting jar into `.bin/Hexed.jar`.
-        if !params
-            .gradle()
-            .arg("build")
-            .status()
-            .unwrap()
-            .success()
-        {
+        if !params.gradle().arg("build").status().unwrap().success() {
             panic!("building Hexed failed");
         }
     }
@@ -58,7 +52,7 @@ impl TargetImpl for Impl {
         fs::write(
             root.join("config/corePlugin.toml"),
             format!(
-                "serverName = \"hexed\"\nglobalConfigPath = {:?}",
+                "serverName = \"hexed\"\ngamemode = \"hexed\"\nglobalConfigPath = {:?}",
                 params.root.join(".run/globalConfig.toml")
             ),
         )
