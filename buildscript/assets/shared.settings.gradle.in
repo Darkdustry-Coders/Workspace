@@ -1,8 +1,8 @@
 dependencyResolutionManagement {
     versionCatalogs {
         libs {
-            def kotlin = "2.2.0"
-            def kotlin_ksp = "2.0.2"
+            def kotlin = "2.3.0"
+            // def kotlin_ksp = "2.0.2"
             def kotlin_cbor_json = "1.8.0"
             def kotlin_ktoml = "0.7.0"
             def kotlin_datetime = "0.6.2"
@@ -14,7 +14,7 @@ dependencyResolutionManagement {
             def jansi = "2.4.2"
 
             plugin("kotlin-jvm", "org.jetbrains.kotlin.jvm").version(kotlin)
-            plugin("kotlin-ksp", "com.google.devtools.ksp").version("$kotlin-$kotlin_ksp")
+            plugin("kotlin-ksp", "com.google.devtools.ksp").version(kotlin)
             plugin("kotlin-serialization", "org.jetbrains.kotlin.plugin.serialization").version(kotlin)
             plugin("kotlin-assert", "org.jetbrains.kotlin.plugin.power-assert").version(kotlin)
 
@@ -25,7 +25,7 @@ dependencyResolutionManagement {
             library("kotlin-datetime", "org.jetbrains.kotlinx", "kotlinx-datetime").version(kotlin_datetime)
 
             library("kotlin-reflect", "org.jetbrains.kotlin", "kotlin-reflect").version(kotlin)
-            library("kotlin-ksp", "com.google.devtools.ksp", "symbol-processing-api").version("$kotlin-$kotlin_ksp")
+            library("kotlin-ksp", "com.google.devtools.ksp", "symbol-processing-api").version(kotlin)
             library("kotlin-coro", "org.jetbrains.kotlinx", "kotlinx-coroutines-core").version(kotlin_coro)
 
             library("mindustry-arc", "MINDUSTRY_PKG_ARC", "arc-core").version(mindustry)
