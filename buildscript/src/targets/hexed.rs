@@ -29,7 +29,13 @@ impl Impl {
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
         // On Hexed side it should copy resulting jar into `.bin/Hexed.jar`.
-        if !params.gradle().arg("build").status().unwrap().success() {
+        if !params
+            .gradle()
+            .arg(":hexed:build")
+            .status()
+            .unwrap()
+            .success() 
+        {
             panic!("building Hexed failed");
         }
     }
@@ -84,7 +90,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let commands = "";
+            let commands = "hexed";
             contents.push(4);
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
