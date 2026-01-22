@@ -215,6 +215,7 @@ pub struct InitParams {
     pub rust_workspace_members: Vec<String>,
     pub java_workspace_members: Vec<String>,
     pub root: PathBuf,
+    pub host_rabbitmq: bool,
 }
 impl InitParams {
     pub fn new(args: &BuildArgs) -> Self {
@@ -224,6 +225,7 @@ impl InitParams {
             rust_workspace_members: Default::default(),
             java_workspace_members: Default::default(),
             root: current_dir().to_path_buf(),
+            host_rabbitmq: !args.rabbitmq_url.is_empty(),
         }
     }
 }
@@ -235,6 +237,7 @@ pub struct BuildParams {
     pub path: Vec<PathBuf>,
     pub root: PathBuf,
     pub java_stacktrace: bool,
+    pub host_rabbitmq: bool,
 }
 impl BuildParams {
     pub fn new(params: InitParams, args: &BuildArgs) -> Self {
@@ -245,6 +248,7 @@ impl BuildParams {
             path: Default::default(),
             root: params.root,
             java_stacktrace: args.java_stackstrace,
+            host_rabbitmq: !args.rabbitmq_url.is_empty(),
         }
     }
 
@@ -301,6 +305,7 @@ pub struct RunParams {
     pub path: Vec<PathBuf>,
     pub port: u16,
     pub root: PathBuf,
+    pub host_rabbitmq: bool,
 }
 impl RunParams {
     pub fn new(params: BuildParams, args: &BuildArgs) -> Self {
@@ -309,6 +314,7 @@ impl RunParams {
             path: params.path,
             port: args.ports_start,
             root: params.root,
+            host_rabbitmq: !args.rabbitmq_url.is_empty(),
         }
     }
 

@@ -34,7 +34,7 @@ impl TargetImpl for Impl {
             .arg(":hexed:build")
             .status()
             .unwrap()
-            .success() 
+            .success()
         {
             panic!("building Hexed failed");
         }
@@ -58,8 +58,8 @@ impl TargetImpl for Impl {
         fs::write(
             root.join("config/corePlugin.toml"),
             format!(
-                "serverName = \"hexed\"\ngamemode = \"hexed\"\nglobalConfigPath = {:?}",
-                params.root.join(".run/globalConfig.toml")
+                "serverName = \"hexed\"\ngamemode = \"hexed\"\nsharedConfigPath = {:?}",
+                params.root.join(".run/sharedConfig.toml")
             ),
         )
         .unwrap();

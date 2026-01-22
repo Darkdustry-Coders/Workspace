@@ -63,8 +63,8 @@ impl TargetImpl for Impl {
         fs::write(
             root.join("config/corePlugin.toml"),
             format!(
-                "serverName = \"forts\"\ngamemode = \"forts\"\nglobalConfigPath = {:?}",
-                params.root.join(".run/globalConfig.toml")
+                "serverName = \"forts\"\ngamemode = \"forts\"\nsharedConfigPath = {:?}",
+                params.root.join(".run/sharedConfig.toml")
             ),
         )
         .unwrap();

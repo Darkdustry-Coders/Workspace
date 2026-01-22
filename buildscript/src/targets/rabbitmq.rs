@@ -33,6 +33,10 @@ impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, _: &mut super::BuildParams) {}
 
     fn run_init(&mut self, _: super::Targets<'_>, params: &mut super::RunParams) {
+        if params.host_rabbitmq {
+            return;
+        }
+
         self.port = params.next_port();
         self.management_port = params.next_port();
 
@@ -60,6 +64,10 @@ impl TargetImpl for Impl {
     }
 
     fn run(&mut self, mut deps: super::Targets<'_>, params: &mut super::RunParams) {
+        if params.host_rabbitmq {
+            return;
+        }
+
         let rabbitmq_root = params.root.join(".run/rabbitmq");
 
         let mut command = Command::new(self.rabbitmq_home.join("sbin").join("rabbitmq-server"));
@@ -95,8 +103,12 @@ impl TargetImplStatic for Impl {
     fn initialize_host(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        _: &mut super::InitParams,
+        params: &mut super::InitParams,
     ) -> Option<Self> {
+        if params.host_rabbitmq {
+            return Some(Impl::new(PathBuf::new()));
+        }
+
         find_executable("rabbitmq-server")
             .map(|x| fs::canonicalize(x).unwrap())
             .map(|x| x.parent().unwrap().parent().unwrap().to_path_buf())
@@ -106,8 +118,12 @@ impl TargetImplStatic for Impl {
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        _: &mut super::InitParams,
+        params: &mut super::InitParams,
     ) -> Option<Self> {
+        if params.host_rabbitmq {
+            return Some(Impl::new(PathBuf::new()));
+        }
+
         if is_executable(".cache/tools/rabbitmq/sbin/rabbitmq-server") {
             Some(Self::new(
                 fs::canonicalize(".cache/tools/rabbitmq").unwrap(),
@@ -120,8 +136,12 @@ impl TargetImplStatic for Impl {
     fn initialize_local(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        _: &mut super::InitParams,
+        params: &mut super::InitParams,
     ) -> Self {
+        if params.host_rabbitmq {
+            return Impl::new(PathBuf::new());
+        }
+
         let archive = ".cache/tools/rabbitmq/archive.tar.xz";
         let dir = Path::new(archive).parent().unwrap();
         fs::create_dir_all(dir).unwrap();

@@ -3,6 +3,7 @@ mod targets;
 mod util;
 
 use std::{
+    borrow::Cow,
     env::current_dir,
     fs, io,
     path::PathBuf,
@@ -206,10 +207,22 @@ fn main() {
 
                 targets.run_init_all(&mut params);
 
-                if let Some(rabbitmq) = targets.rabbitmq.as_ref().map(|x| x.url()) {
+                if let Some(rabbitmq) = targets.rabbitmq.as_ref() {
                     fs::write(
-                        ".run/globalConfig.toml",
-                        format!("serverIp = \"127.0.0.1\"\nrabbitMqUrl = {rabbitmq:?}"),
+                        ".run/sharedConfig.toml",
+                        format!(
+                            "serverIp = {:?}\nrabbitMqUrl = {:?}",
+                            if build.server_ip.is_empty() {
+                                "127.0.0.1"
+                            } else {
+                                build.server_ip.as_str()
+                            },
+                            if build.rabbitmq_url.is_empty() {
+                                Cow::Owned(rabbitmq.url())
+                            } else {
+                                Cow::Borrowed(build.rabbitmq_url.as_str())
+                            },
+                        ),
                     )
                     .unwrap();
                 }

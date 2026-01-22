@@ -37,6 +37,8 @@ pub struct BuildArgs {
     pub git_backend: GitBackend,
 
     pub ports_start: u16,
+    pub server_ip: String,
+    pub rabbitmq_url: String,
 
     pub java_stackstrace: bool,
 }
@@ -108,9 +110,10 @@ pub fn print_help() {
     eprintln!("Extra params for build:");
     eprintln!("\t--mindustry [VER]  - set mindustry version (v154 by default)");
     eprintln!("\t--run              - run targets");
-    eprintln!("\t--clean            - clean temporary files");
-    eprintln!("\t--pack             - build a package");
     eprintln!("\t--stacktrace       - pass '--stacktrace' to gradle");
+    eprintln!("\t--server-ip [IP]   - set ip used for key authorization");
+    eprintln!("\t--rabbbitmq [URL]  - set rabbitmq url");
+    eprintln!("\t                     Also disables installing and running RabbitMQ");
     eprintln!();
     eprintln!("Available targets:");
     for x in TARGET_NAMES {
@@ -194,9 +197,24 @@ pub fn args() -> Args {
                                 errors.push("--mindustry: no value specified".to_string());
                             }
                         }
+                        "server-ip" => {
+                            if let Some(x) = argv.next() {
+                                build.server_ip = x;
+                            } else {
+                                errors.push("--server-ip: no value specified".to_string());
+                            }
+                        }
+                        "rabbitmq" => {
+                            if let Some(x) = argv.next() {
+                                build.rabbitmq_url = x;
+                            } else {
+                                errors.push("--rabbitmq: no value specified".to_string());
+                            }
+                        }
                         x => errors.push(format!("unknown option {:?}", format!("--{x}"))),
                     }
                 } else if let Some(x) = x.strip_prefix("-") {
+                    _ = x;
                 } else {
                     build.targets.push(x.to_string());
                 }
