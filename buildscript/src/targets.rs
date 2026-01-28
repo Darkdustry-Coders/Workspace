@@ -216,6 +216,7 @@ pub struct InitParams {
     pub java_workspace_members: Vec<String>,
     pub root: PathBuf,
     pub host_rabbitmq: bool,
+    pub host_surrealdb: bool,
 }
 impl InitParams {
     pub fn new(args: &BuildArgs) -> Self {
@@ -226,6 +227,7 @@ impl InitParams {
             java_workspace_members: Default::default(),
             root: current_dir().to_path_buf(),
             host_rabbitmq: !args.rabbitmq_url.is_empty(),
+            host_surrealdb: !args.surrealdb_url.is_empty(),
         }
     }
 }
@@ -238,6 +240,7 @@ pub struct BuildParams {
     pub root: PathBuf,
     pub java_stacktrace: bool,
     pub host_rabbitmq: bool,
+    pub host_surrealdb: bool,
 }
 impl BuildParams {
     pub fn new(params: InitParams, args: &BuildArgs) -> Self {
@@ -249,6 +252,7 @@ impl BuildParams {
             root: params.root,
             java_stacktrace: args.java_stackstrace,
             host_rabbitmq: !args.rabbitmq_url.is_empty(),
+            host_surrealdb: !args.surrealdb_url.is_empty(),
         }
     }
 
@@ -306,6 +310,7 @@ pub struct RunParams {
     pub port: u16,
     pub root: PathBuf,
     pub host_rabbitmq: bool,
+    pub host_surrealdb: bool,
 }
 impl RunParams {
     pub fn new(params: BuildParams, args: &BuildArgs) -> Self {
@@ -315,6 +320,7 @@ impl RunParams {
             port: args.ports_start,
             root: params.root,
             host_rabbitmq: !args.rabbitmq_url.is_empty(),
+            host_surrealdb: !args.surrealdb_url.is_empty(),
         }
     }
 

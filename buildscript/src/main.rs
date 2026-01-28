@@ -207,11 +207,13 @@ fn main() {
 
                 targets.run_init_all(&mut params);
 
-                if let Some(rabbitmq) = targets.rabbitmq.as_ref() {
+                if let Some(rabbitmq) = targets.rabbitmq.as_ref()
+                    && let Some(surreal) = targets.surrealdb.as_ref()
+                {
                     fs::write(
                         ".run/sharedConfig.toml",
                         format!(
-                            "serverIp = {:?}\nrabbitMqUrl = {:?}",
+                            "serverIp = {:?}\nrabbitMqUrl = {:?}\nsurrealDbUrl = {:?}",
                             if build.server_ip.is_empty() {
                                 "127.0.0.1"
                             } else {
@@ -221,6 +223,11 @@ fn main() {
                                 Cow::Owned(rabbitmq.url())
                             } else {
                                 Cow::Borrowed(build.rabbitmq_url.as_str())
+                            },
+                            if build.surrealdb_url.is_empty() {
+                                Cow::Owned(surreal.url())
+                            } else {
+                                Cow::Borrowed(build.surrealdb_url.as_str())
                             },
                         ),
                     )

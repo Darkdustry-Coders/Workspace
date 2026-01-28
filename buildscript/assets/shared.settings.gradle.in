@@ -2,13 +2,12 @@ dependencyResolutionManagement {
     versionCatalogs {
         libs {
             def kotlin = "2.3.0"
-            // def kotlin_ksp = "2.0.2"
             def kotlin_cbor_json = "1.8.0"
             def kotlin_ktoml = "0.7.0"
             def kotlin_datetime = "0.6.2"
             def kotlin_coro = "1.10.2"
             def rabbitmq_aqmp = "5.26.0";
-            def surrealdb = "0.2.1"
+            def surrealdb = "0.3"
             def mindustry = "MINDUSTRY_VERSION"
             def jline = "3.21.0"
             def jansi = "2.4.2"
@@ -33,7 +32,7 @@ dependencyResolutionManagement {
             library("mindustry-server", "MINDUSTRY_PKG_MINDUSTRY", "server").version(mindustry)
 
             library("rabbitmq-amqp", "com.rabbitmq", "amqp-client").version(rabbitmq_aqmp)
-            library("surrealdb", "com.surrealdb", "surrealdb").version(surrealdb)
+            library("surrealdb", "net.buj", "SurrealRPC").version(surrealdb)
 
             library("jline-core", "org.jline", "jline").version(jline)
             library("jline-terminal", "org.jline", "jline-terminal").version(jline)

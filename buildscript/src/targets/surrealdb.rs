@@ -25,6 +25,10 @@ impl Impl {
     fn new(surreal: PathBuf) -> Self {
         Self { surreal, port: 0 }
     }
+
+    pub fn url(&self) -> String {
+        format!("ws://admin:password@localhost:{}/main/mindustry", self.port)
+    }
 }
 impl TargetImpl for Impl {
     fn build(&mut self, _: Targets<'_>, _: &mut super::BuildParams) {
@@ -32,6 +36,10 @@ impl TargetImpl for Impl {
     }
 
     fn run_init(&mut self, _: Targets<'_>, params: &mut RunParams) {
+        if params.host_surrealdb {
+            return;
+        }
+
         self.port = params.next_port();
         params.env.insert("SURREAL_USER".into(), "admin".into());
         params.env.insert("SURREAL_PASS".into(), "password".into());
@@ -42,6 +50,10 @@ impl TargetImpl for Impl {
     }
 
     fn run(&mut self, mut deps: Targets<'_>, params: &mut RunParams) {
+        if params.host_surrealdb {
+            return;
+        }
+
         deps.mprocs.as_mut().unwrap().spawn_task(
             params,
             Command::new(self.surreal.join(exe_path!("surreal")))
@@ -65,16 +77,30 @@ impl TargetImplStatic for Impl {
     fn initialize_host(
         _: TargetEnabled,
         _: Targets<'_>,
-        _: &mut super::InitParams,
+        params: &mut super::InitParams,
     ) -> Option<Self> {
+        if params.host_surrealdb {
+            return Some(Impl {
+                surreal: PathBuf::new(),
+                port: 0,
+            });
+        }
+
         let surreal = find_executable("surreal").map(|x| x.parent().unwrap().to_path_buf());
         surreal.map(|surreal| Impl { surreal, port: 0 })
     }
     fn initialize_cached(
         _: TargetEnabled,
         _: Targets<'_>,
-        _: &mut super::InitParams,
+        params: &mut super::InitParams,
     ) -> Option<Self> {
+        if params.host_surrealdb {
+            return Some(Impl {
+                surreal: PathBuf::new(),
+                port: 0,
+            });
+        }
+
         if is_executable(exe_path!(".cache/tools/surrealdb/surreal")) {
             Some(Self {
                 surreal: fs::canonicalize(".cache/tools/surrealdb").unwrap(),
@@ -85,7 +111,14 @@ impl TargetImplStatic for Impl {
         }
     }
     #[allow(unreachable_code)]
-    fn initialize_local(_: TargetEnabled, _: Targets<'_>, _: &mut super::InitParams) -> Self {
+    fn initialize_local(_: TargetEnabled, _: Targets<'_>, params: &mut super::InitParams) -> Self {
+        if params.host_surrealdb {
+            return Impl {
+                surreal: PathBuf::new(),
+                port: 0,
+            };
+        }
+
         #[cfg(target_os = "linux")]
         {
             use crate::util::untar_gz;

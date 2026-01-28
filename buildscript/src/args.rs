@@ -39,6 +39,7 @@ pub struct BuildArgs {
     pub ports_start: u16,
     pub server_ip: String,
     pub rabbitmq_url: String,
+    pub surrealdb_url: String,
 
     pub java_stackstrace: bool,
 }
@@ -114,6 +115,8 @@ pub fn print_help() {
     eprintln!("\t--server-ip [IP]   - set ip used for key authorization");
     eprintln!("\t--rabbbitmq [URL]  - set rabbitmq url");
     eprintln!("\t                     Also disables installing and running RabbitMQ");
+    eprintln!("\t--surrealdb [URL]  - set surrealdb url");
+    eprintln!("\t                     Also disables installing and running SurrealDB");
     eprintln!();
     eprintln!("Available targets:");
     for x in TARGET_NAMES {
