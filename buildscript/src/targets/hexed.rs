@@ -90,7 +90,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let commands = "hexed";
+            let commands = "host";
             contents.push(4);
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
