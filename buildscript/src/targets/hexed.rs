@@ -44,6 +44,8 @@ impl TargetImpl for Impl {
         let root = params.root.join(".run/hexed");
         fs::create_dir_all(root.join("config/mods")).unwrap();
         fs::create_dir_all(root.join("config/maps")).unwrap();
+        fs::create_dir_all(root.join("config/patches")).unwrap();
+
 
         util::symlink_file(
             params.root.join(".bin/CorePlugin.jar"),
@@ -53,6 +55,11 @@ impl TargetImpl for Impl {
         util::symlink_file(
             params.root.join(".bin/Hexed.jar"),
             root.join("config/mods/Hexed.jar"),
+        )
+        .unwrap();
+                fs::copy(
+            params.root.join("hexed/assets/patch.hjson"),
+            root.join("config/patches/patch.hjson"),
         )
         .unwrap();
         fs::write(
