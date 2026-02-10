@@ -12,9 +12,9 @@ use crate::{
 use super::{RunParams, TargetEnabled, TargetFlags, TargetImpl, TargetImplStatic, Targets};
 
 static URL: &str = if cfg!(target_os = "linux") {
-    "https://github.com/surrealdb/surrealdb/releases/download/v2.4.0/surreal-v2.4.0.linux-amd64.tgz"
+    "https://github.com/surrealdb/surrealdb/releases/download/v3.0.0-beta.4/surreal-v3.0.0-beta.4.linux-amd64.tgz"
 } else {
-    "https://github.com/surrealdb/surrealdb/releases/download/v2.4.0/surreal-v2.4.0.windows-amd64.exe"
+    "https://github.com/surrealdb/surrealdb/releases/download/v3.0.0-beta.4/surreal-v3.0.0-beta.4.windows-amd64.exe"
 };
 
 pub struct Impl {
@@ -123,7 +123,7 @@ impl TargetImplStatic for Impl {
         {
             use crate::util::untar_gz;
 
-            let archive = ".cache/tools/surrealdb/archive.tar.xz";
+            let archive = ".cache/tools/surrealdb/archive.tar.gz";
             let dir = Path::new(archive).parent().unwrap();
             fs::create_dir_all(dir).unwrap();
             download(URL, archive);
