@@ -115,12 +115,13 @@ fn main() {
                     .replace(
                         "MINDUSTRY_VERSION",
                         match &build.mindustry_version {
-                            args::MindustryVersion::V154 => "v154",
                             args::MindustryVersion::V146 => "v146.8",
                             args::MindustryVersion::V149 => "v149",
                             args::MindustryVersion::V150 => "v150",
                             args::MindustryVersion::V153 => "v153",
-                            args::MindustryVersion::BleedingEdge => "v153",
+                            args::MindustryVersion::V154 => "v154",
+                            args::MindustryVersion::V155 => "v155",
+                            args::MindustryVersion::BleedingEdge => "v155",
                         },
                     )
                     .replace(
@@ -213,7 +214,7 @@ fn main() {
                     fs::write(
                         ".run/sharedConfig.toml",
                         format!(
-                            "serverIp = {:?}\nrabbitMqUrl = {:?}\nsurrealDbUrl = {:?}",
+                            "serverIp = {:?}\nrabbitMqUrl = {:?}\nsurrealDbUrl = {:?}\ninitDb = true",
                             if build.server_ip.is_empty() {
                                 "127.0.0.1"
                             } else {
