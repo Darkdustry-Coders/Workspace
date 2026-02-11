@@ -100,10 +100,10 @@ impl TargetImplStatic for Impl {
                 Self::new(fs::canonicalize(file).unwrap())
             }
             crate::args::MindustryVersion::V155 => {
-                let file = Path::new(".cache/tools/mindustry/server-v154.jar");
+                let file = Path::new(".cache/tools/mindustry/server-v155.jar");
                 eprintln!("Downloading Mindustry (v155)");
                 download(
-                    "https://github.com/Anuken/Mindustry/releases/download/v154/server-release.jar",
+                    "https://github.com/Anuken/Mindustry/releases/download/v155.1/server-release.jar",
                     file,
                 );
                 Self::new(fs::canonicalize(file).unwrap())
