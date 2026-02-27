@@ -12,9 +12,9 @@ use crate::{
 use super::{RunParams, TargetEnabled, TargetFlags, TargetImpl, TargetImplStatic, Targets};
 
 static URL: &str = if cfg!(target_os = "linux") {
-    "https://github.com/surrealdb/surrealdb/releases/download/v3.0.0-beta.4/surreal-v3.0.0-beta.4.linux-amd64.tgz"
+    "https://github.com/surrealdb/surrealdb/releases/download/v3.0.1/surreal-v3.0.1.linux-amd64.tgz"
 } else {
-    "https://github.com/surrealdb/surrealdb/releases/download/v3.0.0-beta.4/surreal-v3.0.0-beta.4.windows-amd64.exe"
+    "https://github.com/surrealdb/surrealdb/releases/download/v3.0.1/surreal-v3.0.1.windows-amd64.exe"
 };
 
 pub struct Impl {
