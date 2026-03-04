@@ -1,11 +1,12 @@
 mod args;
+mod syncfs;
 mod targets;
 mod util;
 
 use std::{
     borrow::Cow,
     env::current_dir,
-    fs, io,
+    fs,
     path::PathBuf,
     process::{Command, Stdio, exit},
     str::FromStr,
@@ -15,7 +16,7 @@ use args::{Args, EnvTy};
 use targets::{BuildParams, InitParams, RunParams, TARGET_NAMES, Target, TargetList, Targets};
 use util::CURRENT_DIR;
 
-use crate::util::write_if_diff;
+use crate::{syncfs::SyncFs, util::write_if_diff};
 
 fn main() {
     unsafe {
@@ -199,20 +200,20 @@ fn main() {
                 //     );
                 // }
 
-                if let Err(why) = fs::remove_dir_all(".run")
-                    && why.kind() != io::ErrorKind::NotFound
-                {
-                    panic!("{why:#}");
-                }
-                fs::create_dir_all(".run").unwrap();
+                // if let Err(why) = fs::remove_dir_all(".run")
+                //     && why.kind() != io::ErrorKind::NotFound
+                // {
+                //     panic!("{why:#}");
+                // }
+                // fs::create_dir_all(".run").unwrap();
 
                 targets.run_init_all(&mut params);
 
                 if let Some(rabbitmq) = targets.rabbitmq.as_ref()
                     && let Some(surreal) = targets.surrealdb.as_ref()
                 {
-                    fs::write(
-                        ".run/sharedConfig.toml",
+                    params.run.write(
+                        "sharedConfig.toml",
                         format!(
                             "serverIp = {:?}\nrabbitMqUrl = {:?}\nsurrealDbUrl = {:?}\ninitDb = true",
                             if build.server_ip.is_empty() {
@@ -231,9 +232,11 @@ fn main() {
                                 Cow::Borrowed(build.surrealdb_url.as_str())
                             },
                         ),
-                    )
-                    .unwrap();
+                    );
                 }
+
+                params.run.finalize().unwrap();
+                params.run.clear();
 
                 targets.run_all(&mut params);
 

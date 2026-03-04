@@ -1,6 +1,6 @@
 use std::{
     fs::{self, read_dir},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
 };
 
@@ -41,33 +41,27 @@ impl TargetImpl for Impl {
     }
 
     fn run_init(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
-        let root = params.root.join(".run/forts");
-        fs::create_dir_all(root.join("config/mods")).unwrap();
-        fs::create_dir_all(root.join("config/maps")).unwrap();
+        let root = Path::new(".run/forts");
 
-        util::symlink_file(
+        params.run.link_global(
             params.root.join(".bin/CorePlugin.jar"),
-            root.join("config/mods/CorePlugin.jar"),
-        )
-        .unwrap();
-        util::symlink_file(
+            "forts/config/mods/CorePlugin.jar",
+        );
+        params.run.link_global(
             params.root.join(".bin/Forts.jar"),
-            root.join("config/mods/Forts.jar"),
-        )
-        .unwrap();
-        fs::copy(
+            "forts/config/mods/Forts.jar",
+        );
+        params.run.link_global(
             params.root.join("forts/assets/testmap.msav"),
-            root.join("config/maps/testmap.msav"),
-        )
-        .unwrap();
-        fs::write(
-            root.join("config/corePlugin.toml"),
+            "forts/config/maps/testmap.msav",
+        );
+        params.run.write(
+            "forts/config/corePlugin.toml",
             format!(
                 "serverName = \"forts\"\ngamemode = \"forts\"\nsharedConfigPath = {:?}",
                 params.root.join(".run/sharedConfig.toml")
             ),
-        )
-        .unwrap();
+        );
 
         let port = params.next_port();
 
@@ -100,7 +94,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
 
-            fs::write(root.join("config/settings.bin"), contents).unwrap();
+            params.run.write("forts/config/settings.bin", contents);
         }
 
         let java = deps.java.as_ref().unwrap().home().join("bin/java");

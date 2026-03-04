@@ -1,4 +1,4 @@
-use std::{process::exit, str::FromStr};
+use std::{path::PathBuf, process::exit, str::FromStr};
 
 use crate::targets::TARGET_NAMES;
 
@@ -44,6 +44,8 @@ pub struct BuildArgs {
     pub surrealdb_url: String,
 
     pub java_stackstrace: bool,
+
+    pub keep_states: Vec<PathBuf>,
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
@@ -119,6 +121,7 @@ pub fn print_help() {
     eprintln!("\t                     Also disables installing and running RabbitMQ");
     eprintln!("\t--surrealdb [URL]  - set surrealdb url");
     eprintln!("\t                     Also disables installing and running SurrealDB");
+    eprintln!("\t--keep      [PATH] - keep path intact (relative to `.run`)");
     eprintln!();
     eprintln!("Available targets:");
     for x in TARGET_NAMES {
@@ -212,6 +215,13 @@ pub fn args() -> Args {
                         "rabbitmq" => {
                             if let Some(x) = argv.next() {
                                 build.rabbitmq_url = x;
+                            } else {
+                                errors.push("--rabbitmq: no value specified".to_string());
+                            }
+                        }
+                        "keep" => {
+                            if let Some(x) = argv.next() {
+                                build.keep_states.push(x.into());
                             } else {
                                 errors.push("--rabbitmq: no value specified".to_string());
                             }
