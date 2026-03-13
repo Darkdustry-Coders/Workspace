@@ -58,38 +58,25 @@ impl TargetImpl for Impl {
     fn run_init(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
         let root = params.root.join(".run/hub");
 
-        // Create server directories
-        fs::create_dir_all(root.join("config/mods")).unwrap();
-        fs::create_dir_all(root.join("config/maps")).unwrap();
-
-        // Link plugins
-        util::symlink_file(
+        params.run.link_global(
             params.root.join(".bin/CorePlugin.jar"),
-            root.join("config/mods/CorePlugin.jar"),
-        )
-        .unwrap();
-        util::symlink_file(
+            "hub/config/mods/CorePlugin.jar",
+        );
+        params.run.link_global(
             params.root.join(".bin/LightweightHub.jar"),
-            root.join("config/mods/LightweightHub.jar"),
-        )
-        .unwrap();
-
-        // Copy test map
-        fs::copy(
+            "hub/config/mods/LightweightHub.jar",
+        );
+        params.run.link_global(
             params.root.join("hub/assets/testmap.msav"),
-            root.join("config/maps/testmap.msav"),
-        )
-        .unwrap();
-
-        // Create plugin configuration
-        fs::write(
-            root.join("config/corePlugin.toml"),
+            "hub/config/maps/testmap.msav",
+        );
+        params.run.write(
+            "hub/config/corePlugin.toml",
             format!(
                 "serverName = \"hub\"\ngamemode = \"hub\"\nsharedConfigPath = {:?}",
                 params.root.join(".run/sharedConfig.toml")
             ),
-        )
-        .unwrap();
+        );
 
         let port = params.next_port();
 
@@ -102,7 +89,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let name = "Template Server";
+            let name = "[scarlet]Workspace [accent]| [white]Hub";
             contents.push(4);
             contents.extend_from_slice(&(name.len() as u16).to_be_bytes());
             contents.extend_from_slice(name.as_bytes());
@@ -118,12 +105,15 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let commands = "host Protohub survival";
+            let commands = "host HUB_for_Mindurka_v6 survival";
             contents.push(4);
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
 
-            fs::write(root.join("config/settings.bin"), contents).unwrap();
+            params.run.write(
+                "hub/config/settings.bin",
+                contents,
+            );
         }
 
         // Setup Java command

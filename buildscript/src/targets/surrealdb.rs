@@ -74,6 +74,8 @@ impl TargetImpl for Impl {
             params,
             Command::new(self.surreal.join(exe_path!("surreal")))
                 .arg("start")
+                .arg("--import-file")
+                .arg(fs::canonicalize("sql/init.surrealql").unwrap())
                 .arg(format!(
                     "surrealkv://{}",
                     params.root.join(".run/surrealdb").to_str().unwrap()
