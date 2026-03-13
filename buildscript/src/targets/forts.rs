@@ -89,7 +89,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let name = "[scarlet]workspace [accent]| [white]forts";
+            let name = "[scarlet]Workspace [accent]| [white]Forts";
             contents.push(4);
             contents.extend_from_slice(&(name.len() as u16).to_be_bytes());
             contents.extend_from_slice(name.as_bytes());

@@ -77,7 +77,7 @@ impl TargetImpl for Impl {
             "hexed/config/corePlugin.toml",
             format!(
                 r#"
-                serverName = "hexed"
+                serverName = "hexed-pvp"
                 gamemode = "hexed"
                 sharedConfigPath = {:?}
                 "#,
@@ -95,7 +95,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let name = "[scarlet]workspace [accent]| [white]forts";
+            let name = "[scarlet]Workspace [accent]| [white]Hexed";
             contents.push(4);
             contents.extend_from_slice(&(name.len() as u16).to_be_bytes());
             contents.extend_from_slice(name.as_bytes());
@@ -116,17 +116,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
 
-            params.run.write(
-                "hexed/config/settings.bin",
-                format!(
-                    r#"
-                    serverName = "hexed-pvp"
-                    gamemode = "hexed"
-                    sharedConfigPath = {:?}
-                    "#,
-                    params.root.join(".run/sharedConfig.toml")
-                ),
-            );
+            params.run.write("hexed/config/settings.bin", contents);
         }
 
         let java = deps.java.as_ref().unwrap().home().join("bin/java");
