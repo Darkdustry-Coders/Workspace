@@ -10,7 +10,7 @@ use std::{
     process::Command,
 };
 
-use crate::util::{self, current_dir};
+use crate::util::current_dir;
 
 use super::{Target, TargetImpl, TargetImplStatic};
 
@@ -80,12 +80,11 @@ impl TargetImpl for Impl {
 
         let port = params.next_port();
 
-        // Create Mindustry settings
         {
             let mut contents = vec![];
             contents.extend_from_slice(&3i32.to_be_bytes());
 
-            let option = "name";
+            let option = "servername";
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
@@ -113,7 +112,6 @@ impl TargetImpl for Impl {
             params.run.write("hub/config/settings.bin", contents);
         }
 
-        // Setup Java command
         let java = deps.java.as_ref().unwrap().home().join("bin/java");
         let mindustry = deps.mindustry.as_ref().unwrap().path();
 

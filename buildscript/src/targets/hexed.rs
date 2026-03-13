@@ -59,29 +59,22 @@ impl TargetImpl for Impl {
     fn run_init(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
         let root = params.root.join(".run/hexed");
 
-        fs::create_dir_all(root.join("config/mods")).unwrap();
-        fs::create_dir_all(root.join("config/maps")).unwrap();
-        fs::create_dir_all(root.join("config/patches")).unwrap();
-
-        util::symlink_file(
+        params.run.link_global(
             params.root.join(".bin/CorePlugin.jar"),
-            root.join("config/mods/CorePlugin.jar"),
-        )
-        .unwrap();
-        util::symlink_file(
+            "hexed/config/mods/CorePlugin.jar",
+        );
+        params.run.link_global(
             params.root.join(".bin/Hexed.jar"),
-            root.join("config/mods/Hexed.jar"),
-        )
-        .unwrap();
+            "hexed/config/mods/Hexed.jar",
+        );
 
-        fs::copy(
+        params.run.link_global(
             params.root.join("hexed/assets/patch.hjson"),
-            root.join("config/patches/patch.hjson"),
-        )
-        .unwrap();
+            "hexed/config/patches/patch.hjson",
+        );
 
-        fs::write(
-            root.join("config/corePlugin.toml"),
+        params.run.write(
+            "hexed/config/corePlugin.toml",
             format!(
                 r#"
                 serverName = "hexed"
@@ -90,8 +83,7 @@ impl TargetImpl for Impl {
                 "#,
                 params.root.join(".run/sharedConfig.toml")
             ),
-        )
-        .unwrap();
+        );
 
         let port = params.next_port();
 
@@ -99,11 +91,11 @@ impl TargetImpl for Impl {
             let mut contents = vec![];
             contents.extend_from_slice(&3i32.to_be_bytes());
 
-            let option = "name";
+            let option = "servername";
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let name = "Template Server";
+            let name = "[scarlet]workspace [accent]| [white]forts";
             contents.push(4);
             contents.extend_from_slice(&(name.len() as u16).to_be_bytes());
             contents.extend_from_slice(name.as_bytes());
@@ -124,7 +116,17 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
 
-            fs::write(root.join("config/settings.bin"), contents).unwrap();
+            params.run.write(
+                "hexed/config/settings.bin",
+                format!(
+                    r#"
+                    serverName = "hexed-pvp"
+                    gamemode = "hexed"
+                    sharedConfigPath = {:?}
+                    "#,
+                    params.root.join(".run/sharedConfig.toml")
+                ),
+            );
         }
 
         let java = deps.java.as_ref().unwrap().home().join("bin/java");
@@ -178,7 +180,7 @@ impl TargetImplStatic for Impl {
     ) -> Self {
         if !Command::new("git")
             .arg("clone")
-            .arg(params.git_backend.repo_url("Darkdustry-Coders/HexedPlugin"))
+            .arg(params.git_backend.repo_url("Darkdustry-Coders/Hexed-V8"))
             .arg(params.root.join("hexed"))
             .status()
             .unwrap()

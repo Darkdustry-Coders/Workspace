@@ -85,11 +85,11 @@ impl TargetImpl for Impl {
             let mut contents = vec![];
             contents.extend_from_slice(&3i32.to_be_bytes());
 
-            let option = "name";
+            let option = "servername";
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let name = "[scarlet]Workspace [accent]| [white]Forts";
+            let name = "[scarlet]workspace [accent]| [white]forts";
             contents.push(4);
             contents.extend_from_slice(&(name.len() as u16).to_be_bytes());
             contents.extend_from_slice(name.as_bytes());
