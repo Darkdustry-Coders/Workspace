@@ -16,7 +16,7 @@ use args::{Args, EnvTy};
 use targets::{BuildParams, InitParams, RunParams, TARGET_NAMES, Target, TargetList, Targets};
 use util::CURRENT_DIR;
 
-use crate::{syncfs::SyncFs, util::write_if_diff};
+use crate::util::write_if_diff;
 
 fn main() {
     unsafe {
@@ -200,13 +200,7 @@ fn main() {
                 //     );
                 // }
 
-                // if let Err(why) = fs::remove_dir_all(".run")
-                //     && why.kind() != io::ErrorKind::NotFound
-                // {
-                //     panic!("{why:#}");
-                // }
-                // fs::create_dir_all(".run").unwrap();
-
+                params.run.restore(".run-save", "");
                 targets.run_init_all(&mut params);
 
                 if let Some(rabbitmq) = targets.rabbitmq.as_ref()
@@ -215,7 +209,7 @@ fn main() {
                     params.run.write(
                         "sharedConfig.toml",
                         format!(
-                            "serverIp = {:?}\nrabbitMqUrl = {:?}\nsurrealDbUrl = {:?}\ninitDb = true",
+                            "serverIp = {:?}\nrabbitMqUrl = {:?}\nsurrealDbUrl = {:?}",
                             if build.server_ip.is_empty() {
                                 "127.0.0.1"
                             } else {
