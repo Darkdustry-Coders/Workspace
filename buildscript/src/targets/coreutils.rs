@@ -1,7 +1,6 @@
-//! OS coreutils target module.
+//! CoreUtils target.
 //!
-//! This module provides core Unix utilities through busybox.
-//! It's used as a fallback when system coreutils are not available.
+//! This module autoinstalls coreutils in isolated environments.
 
 use std::{
     fs::{self, read_dir},
@@ -41,7 +40,7 @@ impl TargetImplStatic for Impl {
         if cfg!(unix) {
             let path = find_executable("xargs")?;
             let path = path.parent()?;
-            // Verify core utilities are available
+            // Surely that's enough
             for x in ["uname", "yes", "[", "cat", "touch"] {
                 if !is_executable(path.join(x)) {
                     return None;
@@ -84,7 +83,6 @@ impl TargetImplStatic for Impl {
             fs::set_permissions(".cache/tools/coreutils/busybox", permissions).unwrap();
         }
 
-        // Parse busybox help to get available commands
         let commands = String::from_utf8(
             Command::new(".cache/tools/coreutils/busybox")
                 .env("LANG", "C")
@@ -100,7 +98,6 @@ impl TargetImplStatic for Impl {
             .skip(1)
             .flat_map(|x| x.split(',').map(str::trim).filter(|x| !x.is_empty()));
 
-        // Create symlinks for all busybox commands
         let coreutils = path.join("busybox");
         for x in commands {
             util::symlink_file(&coreutils, Path::new(".cache/tools/coreutils").join(x)).unwrap();

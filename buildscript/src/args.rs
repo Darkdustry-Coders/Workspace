@@ -1,4 +1,4 @@
-//! Command line argument parsing module.
+//! Command line argument parsing.
 //!
 //! This module handles parsing of command line arguments for the buildscript,
 //! including build targets, environment settings, and various options.

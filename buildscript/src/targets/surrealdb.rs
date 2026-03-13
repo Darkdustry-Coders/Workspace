@@ -1,7 +1,6 @@
-//! SurrealDB database target module.
+//! SurrealDB database.
 //!
-//! This module manages SurrealDB installation and configuration
-//! for the database infrastructure.
+//! This module manages SurrealDB installation.
 
 use std::{
     fs,

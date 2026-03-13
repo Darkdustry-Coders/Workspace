@@ -1,4 +1,4 @@
-//! RabbitMQ message broker target module.
+//! RabbitMQ message broker.
 //!
 //! This module manages RabbitMQ installation and configuration
 //! for the message queue infrastructure.
@@ -28,7 +28,7 @@ pub struct Impl {
 }
 
 impl Impl {
-    /// Creates a new RabbitMQ instance.
+    /// Create a new RabbitMQ instance.
     ///
     /// # Arguments
     /// * `rabbitmq_home` - Path to RabbitMQ installation
@@ -40,7 +40,7 @@ impl Impl {
         }
     }
 
-    /// Returns the AMQP connection URL.
+    /// Obtain the AMQP connection URL.
     pub fn url(&self) -> String {
         format!("amqp://guest:guest@localhost:{}/%2F", self.port)
     }
@@ -60,7 +60,6 @@ impl TargetImpl for Impl {
         let rabbitmq_root = params.root.join(".run/rabbitmq");
         fs::create_dir_all(&rabbitmq_root).unwrap();
 
-        // Create RabbitMQ configuration
         let mut config = BufWriter::new(File::create(rabbitmq_root.join("rabbitmq.conf")).unwrap());
         config
             .write_all(
@@ -73,7 +72,6 @@ impl TargetImpl for Impl {
             .unwrap();
         config.flush().unwrap();
 
-        // Enable management plugin
         let mut config =
             BufWriter::new(File::create(rabbitmq_root.join("enabled-plugins")).unwrap());
         config

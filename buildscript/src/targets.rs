@@ -4,7 +4,6 @@ use std::{
     ffi::{OsStr, OsString},
     io::{Write, stderr, stdin},
     ops::{Deref, DerefMut},
-    os::unix::fs::PermissionsExt,
     path::PathBuf,
     process::{Command, exit},
     str::FromStr,

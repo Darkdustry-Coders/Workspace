@@ -1,7 +1,6 @@
-//! Java JDK target module.
+//! Java JDK.
 //!
-//! This module manages Java JDK installation and configuration.
-//! It supports both system Java and downloading Eclipse Temurin JDK 21.
+//! This module manages Java JDK installation.
 
 use std::{
     env::current_dir,

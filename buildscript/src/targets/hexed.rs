@@ -1,4 +1,4 @@
-//! Hexed plugin target module.
+//! Hexed plugin target.
 //!
 //! This module manages the Hexed game mode plugin for Mindustry.
 //! Hexed is a strategic hex-based territory control game mode.
@@ -44,7 +44,7 @@ impl Impl {
 
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
-        // Build Hexed plugin
+        // On Hexed side it should copy resulting jar into `.bin/Hexed.jar`.
         if !params
             .gradle()
             .arg(":hexed:build")
@@ -59,12 +59,10 @@ impl TargetImpl for Impl {
     fn run_init(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
         let root = params.root.join(".run/hexed");
 
-        // Create server directories
         fs::create_dir_all(root.join("config/mods")).unwrap();
         fs::create_dir_all(root.join("config/maps")).unwrap();
         fs::create_dir_all(root.join("config/patches")).unwrap();
 
-        // Link plugins
         util::symlink_file(
             params.root.join(".bin/CorePlugin.jar"),
             root.join("config/mods/CorePlugin.jar"),
@@ -76,14 +74,12 @@ impl TargetImpl for Impl {
         )
         .unwrap();
 
-        // Copy patch configuration
         fs::copy(
             params.root.join("hexed/assets/patch.hjson"),
             root.join("config/patches/patch.hjson"),
         )
         .unwrap();
 
-        // Create plugin configuration
         fs::write(
             root.join("config/corePlugin.toml"),
             format!(
@@ -99,7 +95,6 @@ impl TargetImpl for Impl {
 
         let port = params.next_port();
 
-        // Create Mindustry settings
         {
             let mut contents = vec![];
             contents.extend_from_slice(&3i32.to_be_bytes());
@@ -132,7 +127,6 @@ impl TargetImpl for Impl {
             fs::write(root.join("config/settings.bin"), contents).unwrap();
         }
 
-        // Setup Java command
         let java = deps.java.as_ref().unwrap().home().join("bin/java");
         let mindustry = deps.mindustry.as_ref().unwrap().path();
 

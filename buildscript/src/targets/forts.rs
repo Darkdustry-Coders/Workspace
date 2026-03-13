@@ -1,4 +1,4 @@
-//! Forts plugin target module.
+//! Forts plugin target.
 //!
 //! This module manages the Forts game mode plugin for Mindustry.
 //! Forts is a strategic defense game mode.
@@ -10,7 +10,7 @@ use std::{
     process::Command,
 };
 
-use crate::util::{self, current_dir};
+use crate::util::current_dir;
 
 use super::{Target, TargetImpl, TargetImplStatic};
 
@@ -44,7 +44,7 @@ impl Impl {
 
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
-        // Build Forts plugin
+        // On Forts side it should copy resulting jar into `.bin/Forts.jar`.
         if !params
             .gradle()
             .arg(":forts:build")
@@ -81,7 +81,6 @@ impl TargetImpl for Impl {
 
         let port = params.next_port();
 
-        // Create Mindustry settings
         {
             let mut contents = vec![];
             contents.extend_from_slice(&3i32.to_be_bytes());
@@ -114,7 +113,6 @@ impl TargetImpl for Impl {
             params.run.write("forts/config/settings.bin", contents);
         }
 
-        // Setup Java command
         let java = deps.java.as_ref().unwrap().home().join("bin/java");
         let mindustry = deps.mindustry.as_ref().unwrap().path();
 

@@ -1,4 +1,4 @@
-//! Mprocs task runner target module.
+//! Mprocs task runner.
 //!
 //! This module manages mprocs - a task runner for running multiple
 //! processes in parallel with a TUI interface.

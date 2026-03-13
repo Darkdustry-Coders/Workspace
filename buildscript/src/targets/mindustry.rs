@@ -1,7 +1,6 @@
-//! Mindustry server target module.
+//! Mindustry server.
 //!
 //! This module manages Mindustry server JAR downloads and configuration.
-//! Supports multiple Mindustry versions from v146 to bleeding edge.
 
 use std::{
     fs::{self, File},
@@ -118,7 +117,7 @@ impl TargetImplStatic for Impl {
                 let file = Path::new(".cache/tools/mindustry/server-v155.jar");
                 eprintln!("Downloading Mindustry (v155)");
                 download(
-                    "https://github.com/Anuken/Mindustry/releases/download/v155.1/server-release.jar",
+                    "https://github.com/Anuken/Mindustry/releases/download/v155.4/server-release.jar",
                     file,
                 );
                 Self::new(fs::canonicalize(file).unwrap())

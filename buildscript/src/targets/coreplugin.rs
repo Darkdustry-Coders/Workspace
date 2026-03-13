@@ -41,7 +41,7 @@ impl Impl {
 
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
-        // Build CorePlugin and publish to local Maven repository
+        // On CorePlugin side it should copy resulting jar into `.bin/CorePlugin.jar`.
         if !params
             .gradle()
             .arg(":coreplugin:build")

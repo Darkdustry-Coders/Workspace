@@ -1,4 +1,4 @@
-//! Hub plugin target module.
+//! Hub plugin target.
 //!
 //! This module manages the LightweightHub plugin - a central hub
 //! server for the Mindustry infrastructure.
@@ -110,10 +110,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
 
-            params.run.write(
-                "hub/config/settings.bin",
-                contents,
-            );
+            params.run.write("hub/config/settings.bin", contents);
         }
 
         // Setup Java command

@@ -1,8 +1,6 @@
-/// Command line argument parsing module.
 mod args;
 mod syncfs;
 mod targets;
-/// Utility functions module.
 mod util;
 
 use std::{
@@ -20,10 +18,6 @@ use util::CURRENT_DIR;
 
 use crate::util::write_if_diff;
 
-/// Entry point of the buildscript application.
-///
-/// Parses command line arguments, initializes the environment,
-/// and executes the requested build or run command.
 fn main() {
     unsafe {
         CURRENT_DIR = Some(current_dir().unwrap());
