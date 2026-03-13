@@ -1,14 +1,26 @@
+//! Utility functions module.
+//!
+//! This module provides various helper functions for file operations,
+//! downloads, and system interactions.
+
 #![allow(unused)]
 
 use std::{
-    fs::{self, File, metadata},
-    io::{self, IsTerminal, Read, Write, stderr},
+    fs::{self, metadata, File},
+    io::{self, stderr, IsTerminal, Read, Write},
     ops::{Div, Mul},
     path::{Path, PathBuf},
     process::Command,
 };
 
+/// Global current directory storage (initialized at startup).
 pub static mut CURRENT_DIR: Option<PathBuf> = None;
+
+/// Returns the current working directory.
+///
+/// # Safety
+/// This function is unsafe as it accesses a mutable static.
+/// It should only be called after initialization.
 pub fn current_dir() -> &'static Path {
     unsafe {
         (&raw const CURRENT_DIR)
@@ -19,10 +31,17 @@ pub fn current_dir() -> &'static Path {
     }
 }
 
+/// Identity function - returns its argument unchanged.
+///
+/// Useful for explicit type annotations in closures.
 pub fn t<T>(t: T) -> T {
     t
 }
 
+/// Iterator adapter that allows interjecting items between iterations.
+///
+/// The closure receives consecutive items and can produce both
+/// a stored value and an output value.
 pub struct Interject<T, I, F>(I, F, Option<T>)
 where
     I: Iterator<Item = T>,
@@ -51,6 +70,14 @@ where
         }
     }
 }
+/// Creates an Interject iterator adapter.
+///
+/// # Arguments
+/// * `iter` - The source iterator
+/// * `fun` - Closure receiving consecutive items
+///
+/// # Returns
+/// An Interject iterator
 pub fn interject<T, I, F>(iter: I, fun: F) -> Interject<T, I, F>
 where
     I: Iterator<Item = T>,
@@ -59,12 +86,18 @@ where
     Interject(iter, fun, None)
 }
 
+/// Iterator that can be either of two iterator types.
+///
+/// Useful when you need to return different iterator types
+/// from a function based on runtime conditions.
 pub enum EitherIter<T, A, B>
 where
     A: Iterator<Item = T>,
     B: Iterator<Item = T>,
 {
+    /// First iterator variant.
     A(A),
+    /// Second iterator variant.
     B(B),
 }
 impl<T, A, B> Iterator for EitherIter<T, A, B>
@@ -92,6 +125,15 @@ macro_rules! exe_path {
         $expr
     };
 }
+/// Checks if a file is executable.
+///
+/// On Unix, checks if the file has execute permissions.
+///
+/// # Arguments
+/// * `path` - Path to the file
+///
+/// # Returns
+/// true if the file is executable
 #[cfg(unix)]
 pub fn is_executable(path: impl AsRef<Path>) -> bool {
     let path = path.as_ref();
@@ -112,6 +154,13 @@ pub fn is_executable(path: impl AsRef<Path>) -> bool {
             }
     })
 }
+/// Finds an executable in the system PATH.
+///
+/// # Arguments
+/// * `cmd` - Command name to find
+///
+/// # Returns
+/// Full path to the executable if found, None otherwise
 #[cfg(unix)]
 pub fn find_executable(cmd: impl AsRef<std::ffi::OsStr>) -> Option<PathBuf> {
     let path = std::env::var("PATH").unwrap();
@@ -133,6 +182,16 @@ pub fn find_executable(cmd: impl AsRef<std::ffi::OsStr>) -> Option<PathBuf> {
     None
 }
 
+/// Writes data to a file only if it differs from existing content.
+///
+/// This prevents unnecessary file modifications and timestamp updates.
+///
+/// # Arguments
+/// * `path` - Path to the file
+/// * `data` - Data to write
+///
+/// # Returns
+/// io::Result indicating success or failure
 pub fn write_if_diff<P: AsRef<Path>, S: AsRef<[u8]>>(path: P, data: S) -> io::Result<()> {
     let path = path.as_ref();
     let mut data = data.as_ref();
@@ -162,6 +221,13 @@ pub fn write_if_diff<P: AsRef<Path>, S: AsRef<[u8]>>(path: P, data: S) -> io::Re
     fs::write(path, data)
 }
 
+/// Downloads a file from a URL with progress display.
+///
+/// Displays a progress bar when stderr is a terminal.
+///
+/// # Arguments
+/// * `url` - URL to download from
+/// * `path` - Local path to save the file
 pub fn download(url: &str, path: impl AsRef<Path>) {
     let path = path.as_ref();
 
@@ -216,6 +282,12 @@ pub fn download(url: &str, path: impl AsRef<Path>) {
     file.flush().unwrap();
 }
 
+/// Extracts a gzip-compressed tar archive.
+///
+/// # Arguments
+/// * `archive` - Path to the tar.gz archive
+/// * `path` - Destination directory
+/// * `skip_segments` - Number of path segments to skip when extracting
 #[cfg(unix)]
 pub fn untar_gz(archive: impl AsRef<Path>, path: impl AsRef<Path>, skip_segments: usize) {
     use std::{io::BufReader, os::unix::fs::PermissionsExt};
@@ -260,6 +332,12 @@ pub fn untar_gz(archive: impl AsRef<Path>, path: impl AsRef<Path>, skip_segments
     }
 }
 
+/// Extracts an xz-compressed tar archive.
+///
+/// # Arguments
+/// * `archive` - Path to the tar.xz archive
+/// * `path` - Destination directory
+/// * `skip_segments` - Number of path segments to skip when extracting
 #[cfg(unix)]
 pub fn untar_xz(archive: impl AsRef<Path>, path: impl AsRef<Path>, skip_segments: usize) {
     use std::{io::BufReader, os::unix::fs::PermissionsExt};
@@ -304,6 +382,14 @@ pub fn untar_xz(archive: impl AsRef<Path>, path: impl AsRef<Path>, skip_segments
     }
 }
 
+/// Creates a symbolic link to a file.
+///
+/// # Arguments
+/// * `source` - Path to the source file
+/// * `dest` - Path for the symbolic link
+///
+/// # Returns
+/// io::Result indicating success or failure
 #[cfg(unix)]
 pub fn symlink_file(source: impl AsRef<Path>, dest: impl AsRef<Path>) -> std::io::Result<()> {
     std::os::unix::fs::symlink(source, dest)

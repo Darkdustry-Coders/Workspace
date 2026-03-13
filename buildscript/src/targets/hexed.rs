@@ -1,3 +1,9 @@
+//! Hexed plugin target module.
+//!
+//! This module manages the Hexed game mode plugin for Mindustry.
+//! Hexed is a strategic hex-based territory control game mode.
+//! Repository: https://github.com/Darkdustry-Coders/HexedPlugin
+
 use std::{
     fs::{self, read_dir},
     path::PathBuf,
@@ -10,14 +16,23 @@ use super::{Target, TargetImpl, TargetImplStatic};
 
 // TODO: Download if enabled status is `Depend` instead of `Build`.
 
+/// Hexed plugin target implementation.
 pub struct Impl {
+    /// Path to the plugin repository.
     #[allow(unused)]
     repo: PathBuf,
+    /// Path to the built JAR file.
     #[allow(unused)]
     path: PathBuf,
+    /// Command to run the server.
     command: Option<Command>,
 }
+
 impl Impl {
+    /// Creates a new Hexed target instance.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the repository
     fn new(path: PathBuf) -> Self {
         Self {
             repo: path,
@@ -26,9 +41,10 @@ impl Impl {
         }
     }
 }
+
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
-        // On Hexed side it should copy resulting jar into `.bin/Hexed.jar`.
+        // Build Hexed plugin
         if !params
             .gradle()
             .arg(":hexed:build")
@@ -42,11 +58,13 @@ impl TargetImpl for Impl {
 
     fn run_init(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
         let root = params.root.join(".run/hexed");
+
+        // Create server directories
         fs::create_dir_all(root.join("config/mods")).unwrap();
         fs::create_dir_all(root.join("config/maps")).unwrap();
         fs::create_dir_all(root.join("config/patches")).unwrap();
 
-
+        // Link plugins
         util::symlink_file(
             params.root.join(".bin/CorePlugin.jar"),
             root.join("config/mods/CorePlugin.jar"),
@@ -57,15 +75,23 @@ impl TargetImpl for Impl {
             root.join("config/mods/Hexed.jar"),
         )
         .unwrap();
-                fs::copy(
+
+        // Copy patch configuration
+        fs::copy(
             params.root.join("hexed/assets/patch.hjson"),
             root.join("config/patches/patch.hjson"),
         )
         .unwrap();
+
+        // Create plugin configuration
         fs::write(
             root.join("config/corePlugin.toml"),
             format!(
-                "serverName = \"hexed\"\ngamemode = \"hexed\"\nsharedConfigPath = {:?}",
+                r#"
+                serverName = "hexed"
+                gamemode = "hexed"
+                sharedConfigPath = {:?}
+                "#,
                 params.root.join(".run/sharedConfig.toml")
             ),
         )
@@ -73,6 +99,7 @@ impl TargetImpl for Impl {
 
         let port = params.next_port();
 
+        // Create Mindustry settings
         {
             let mut contents = vec![];
             contents.extend_from_slice(&3i32.to_be_bytes());
@@ -105,6 +132,7 @@ impl TargetImpl for Impl {
             fs::write(root.join("config/settings.bin"), contents).unwrap();
         }
 
+        // Setup Java command
         let java = deps.java.as_ref().unwrap().home().join("bin/java");
         let mindustry = deps.mindustry.as_ref().unwrap().path();
 
@@ -121,6 +149,7 @@ impl TargetImpl for Impl {
         );
     }
 }
+
 impl TargetImplStatic for Impl {
     fn depends(list: &mut super::TargetList) {
         list.set_depend(Target::Java);
@@ -134,6 +163,7 @@ impl TargetImplStatic for Impl {
     ) -> Option<Self> {
         unimplemented!()
     }
+
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,

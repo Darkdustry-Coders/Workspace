@@ -1,3 +1,9 @@
+//! CorePlugin target module.
+//!
+//! This module manages the Darkdustry CorePlugin - the main plugin
+//! providing shared functionality for all Mindustry plugins.
+//! Repository: https://github.com/Darkdustry-Coders/CorePlugin
+
 use std::{
     fs::{self, read_dir},
     path::PathBuf,
@@ -10,13 +16,21 @@ use super::{Target, TargetImpl, TargetImplStatic};
 
 // TODO: Download if enabled status is `Depend` instead of `Build`.
 
+/// CorePlugin target implementation.
 pub struct Impl {
+    /// Path to the plugin repository.
     #[allow(unused)]
     repo: PathBuf,
+    /// Path to the built JAR file.
     #[allow(unused)]
     path: PathBuf,
 }
+
 impl Impl {
+    /// Creates a new CorePlugin target instance.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the repository
     fn new(path: PathBuf) -> Self {
         Self {
             repo: path,
@@ -24,9 +38,10 @@ impl Impl {
         }
     }
 }
+
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
-        // On CorePlugin side it should copy resulting jar into `.bin/CorePlugin.jar`.
+        // Build CorePlugin and publish to local Maven repository
         if !params
             .gradle()
             .arg(":coreplugin:build")
@@ -42,6 +57,7 @@ impl TargetImpl for Impl {
         }
     }
 }
+
 impl TargetImplStatic for Impl {
     fn depends(list: &mut super::TargetList) {
         list.set_depend(Target::Java);
@@ -57,6 +73,7 @@ impl TargetImplStatic for Impl {
     ) -> Option<Self> {
         unimplemented!()
     }
+
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,

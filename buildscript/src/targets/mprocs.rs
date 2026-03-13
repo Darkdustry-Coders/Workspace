@@ -1,3 +1,8 @@
+//! Mprocs task runner target module.
+//!
+//! This module manages mprocs - a task runner for running multiple
+//! processes in parallel with a TUI interface.
+
 use std::{
     fs,
     num::NonZeroU16,
@@ -11,18 +16,30 @@ use crate::util::{download, find_executable, is_executable, untar_gz};
 
 use super::{RunParams, TargetEnabled, TargetFlags, TargetImpl, TargetImplStatic, Targets};
 
+/// Base URL for mprocs releases.
 static BASE_URL: &str = "https://github.com/pvolok/mprocs/releases/download/v0.7.3/mprocs-0.7.3";
 
+/// Mprocs task runner target implementation.
 pub struct Impl {
+    /// Path to mprocs executable.
     mprocs: PathBuf,
+    /// Server port number.
     port: u16,
+    /// Running process handle.
     process: Option<Child>,
 }
 impl Impl {
+    /// Returns the server port if running.
+    #[allow(dead_code)]
     pub fn port(&self) -> Option<NonZeroU16> {
         NonZeroU16::new(self.port)
     }
 
+    /// Spawns a new task in mprocs.
+    ///
+    /// # Arguments
+    /// * `command` - Command to spawn
+    /// * `name` - Task name for display
     pub fn spawn_task(&self, _: &RunParams, command: &mut Command, name: &str) {
         let mut cmd = String::new();
         if let Some(x) = command.get_current_dir() {
@@ -55,6 +72,7 @@ impl Impl {
         }
     }
 
+    /// Waits for mprocs to exit and returns success status.
     pub fn wait(&mut self) -> bool {
         if let Some(mut x) = self.process.take() {
             if !x.wait().unwrap().success() {

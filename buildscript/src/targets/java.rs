@@ -1,3 +1,8 @@
+//! Java JDK target module.
+//!
+//! This module manages Java JDK installation and configuration.
+//! It supports both system Java and downloading Eclipse Temurin JDK 21.
+
 use std::{
     env::current_dir,
     fs,
@@ -9,15 +14,22 @@ use crate::util::{download, is_executable, untar_gz};
 
 use super::{TargetFlags, TargetImpl, TargetImplStatic};
 
+/// Java JDK target implementation.
 pub struct Impl {
+    /// Path to JAVA_HOME directory.
     java_home: PathBuf,
 }
 impl Impl {
+    /// Creates a new Java target instance.
+    ///
+    /// # Arguments
+    /// * `java_home` - Path to JAVA_HOME
     fn new(java_home: PathBuf) -> Self {
         eprintln!("java: {java_home:?}");
         Self { java_home }
     }
 
+    /// Returns the JAVA_HOME path.
     pub fn home(&self) -> &Path {
         &self.java_home
     }

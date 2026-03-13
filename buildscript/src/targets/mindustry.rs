@@ -1,3 +1,8 @@
+//! Mindustry server target module.
+//!
+//! This module manages Mindustry server JAR downloads and configuration.
+//! Supports multiple Mindustry versions from v146 to bleeding edge.
+
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},
@@ -7,18 +12,27 @@ use crate::util::download;
 
 use super::{TargetImpl, TargetImplStatic};
 
+/// Mindustry server target implementation.
 pub struct Impl {
+    /// Path to the server JAR file.
     path: PathBuf,
 }
+
 impl Impl {
+    /// Creates a new Mindustry target instance.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the server JAR
     fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
+    /// Returns the path to the server JAR.
     pub fn path(&self) -> &Path {
         &self.path
     }
 }
+
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
         params
@@ -26,6 +40,7 @@ impl TargetImpl for Impl {
             .insert("MINDUSTRY_PATH".into(), self.path.clone().into_os_string());
     }
 }
+
 impl TargetImplStatic for Impl {
     fn flags() -> super::TargetFlags {
         super::TargetFlags::new().always_local()

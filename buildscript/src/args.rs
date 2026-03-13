@@ -1,7 +1,13 @@
-use std::{process::exit, str::FromStr};
+//! Command line argument parsing module.
+//!
+//! This module handles parsing of command line arguments for the buildscript,
+//! including build targets, environment settings, and various options.
+
+use std::{collections::HashMap, path::PathBuf, process::exit, str::FromStr};
 
 use crate::targets::TARGET_NAMES;
 
+/// Supported Mindustry server versions.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub enum MindustryVersion {
     BleedingEdge,
@@ -16,6 +22,9 @@ pub enum MindustryVersion {
 impl FromStr for MindustryVersion {
     type Err = ();
 
+    /// Parses a Mindustry version string.
+    ///
+    /// Supported formats: "be", "v146", "v149", "v150", "v153", "v154", "v155"
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "be" => Ok(MindustryVersion::BleedingEdge),
@@ -33,24 +42,35 @@ impl FromStr for MindustryVersion {
 /// Command line parameters for build mode.
 #[derive(Default)]
 pub struct BuildArgs {
+    /// Target Mindustry version for the build.
     pub mindustry_version: MindustryVersion,
+    /// List of build targets to compile.
     pub targets: Vec<String>,
 
+    /// Git backend to use for cloning repositories (SSH or HTTPS).
     pub git_backend: GitBackend,
 
+    /// Starting port number for services.
     pub ports_start: u16,
+    /// Server IP address for key authorization.
     pub server_ip: String,
+    /// RabbitMQ connection URL (disables local RabbitMQ if set).
     pub rabbitmq_url: String,
+    /// SurrealDB connection URL (disables local SurrealDB if set).
     pub surrealdb_url: String,
 
+    /// Enable Java stacktrace output.
     pub java_stackstrace: bool,
+
+    pub templates: HashMap<String, PathBuf>,
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
+/// Environment type for tool management.
 pub enum EnvTy {
-    /// Install all tools locally.
+    /// Install all tools locally in workspace cache.
     Isolate,
-    /// Automatically install tools if not present.
+    /// Automatically install missing tools locally.
     Autoinstall,
     /// Use host system tools.
     #[default]
@@ -58,12 +78,22 @@ pub enum EnvTy {
 }
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
+/// Git backend protocol for cloning repositories.
 pub enum GitBackend {
+    /// SSH protocol (git@github.com:).
     Ssh,
+    /// HTTPS protocol (https://github.com/) (default).
     #[default]
     Https,
 }
 impl GitBackend {
+    /// Generates the full repository URL.
+    ///
+    /// # Arguments
+    /// * `repo` - Repository path (e.g., "user/repo")
+    ///
+    /// # Returns
+    /// Full repository URL
     pub fn repo_url(&self, repo: &str) -> String {
         match self {
             Self::Ssh => format!("git@github.com:{repo}"),
@@ -72,12 +102,19 @@ impl GitBackend {
     }
 }
 
+/// Parsed command line arguments.
 pub enum Args {
+    /// Build command with build parameters and environment type.
     Build { build: BuildArgs, env: EnvTy },
+    /// Run command in environment.
+    #[allow(dead_code)]
     Env { command: Vec<String>, env: EnvTy },
+    /// Show help message.
     Help,
 }
 impl Args {
+    /// Returns the environment type for this command.
+    #[allow(dead_code)]
     pub fn env_ty(&self) -> EnvTy {
         match self {
             Self::Help => EnvTy::Host,
@@ -95,6 +132,7 @@ enum TaskTy {
     Help,
 }
 
+/// Prints the help message with usage information.
 pub fn print_help() {
     eprintln!("buildscript");
     eprintln!();
@@ -138,7 +176,7 @@ pub fn print_help() {
 pub fn args() -> Args {
     let mut env = EnvTy::Host;
     let mut task_ty = TaskTy::Build;
-
+    let mut template: HashMap<String, PathBuf> = HashMap::new();
     let mut argv = std::env::args().peekable();
     argv.next();
 
@@ -156,6 +194,19 @@ pub fn args() -> Args {
                     task_ty = TaskTy::Env
                 }
             }
+            str if str.starts_with("--template=") => template.extend(
+                str.strip_prefix("--template=")
+                    .unwrap()
+                    .split(":")
+                    .map(|it| it.split("="))
+                    .map(|mut it| {
+                        (
+                            it.next().unwrap().into(),
+                            it.next().unwrap().parse().unwrap(),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            ),
             _ => break,
         }
         argv.next();
@@ -164,6 +215,9 @@ pub fn args() -> Args {
     while let Some(x) = argv.peek() {
         match x.as_str() {
             "--isolate" | "--autoinstall" | "--env" => {
+                exit(1);
+            }
+            str if str.starts_with("--template") => {
                 exit(1);
             }
             "--help" => {
@@ -178,6 +232,7 @@ pub fn args() -> Args {
         TaskTy::Help => Args::Help,
         TaskTy::Build => {
             let mut build = BuildArgs::default();
+            build.templates = template;
             let mut errors = vec![];
 
             build.ports_start = 4100;

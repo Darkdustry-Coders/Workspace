@@ -1,91 +1,76 @@
-//! Hub plugin target module.
-//!
-//! This module manages the LightweightHub plugin - a central hub
-//! server for the Mindustry infrastructure.
-//! Repository: https://github.com/Darkdustry-Coders/LightweightHub
-
 use std::{
     fs::{self, read_dir},
     path::PathBuf,
     process::Command,
 };
 
-use crate::util::{self, current_dir};
+use crate::{
+    targets::{Target, TargetImpl, TargetImplStatic},
+    util::{self, current_dir},
+};
 
-use super::{Target, TargetImpl, TargetImplStatic};
-
-// TODO: Download if enabled status is `Depend` instead of `Build`.
-
-/// Hub plugin target implementation.
 pub struct Impl {
-    /// Path to the plugin repository.
     #[allow(unused)]
     repo: PathBuf,
-    /// Path to the built JAR file.
     #[allow(unused)]
     path: PathBuf,
-    /// Command to run the server.
     command: Option<Command>,
 }
 
 impl Impl {
-    /// Creates a new Hub target instance.
-    ///
-    /// # Arguments
-    /// * `path` - Path to the repository
     fn new(path: PathBuf) -> Self {
         Self {
             repo: path,
-            path: current_dir().join(".bin/LightweightHub.jar"),
+            path: current_dir().join(".bin/Newtd.jar"),
             command: None,
         }
     }
 }
 
 impl TargetImpl for Impl {
-    fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
+    fn build(&mut self, _deps: super::Targets<'_>, params: &mut super::BuildParams) {
         if !params
             .gradle()
-            .arg(":hub:build")
+            .arg(":newtd:build")
             .status()
             .unwrap()
             .success()
         {
-            panic!("building LightweightHub failed");
+            panic!("Building new tower defence failed")
         }
     }
 
     fn run_init(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
-        let root = params.root.join(".run/hub");
+        let root = params.root.join(".run/newtd");
 
-        // Create server directories
         fs::create_dir_all(root.join("config/mods")).unwrap();
         fs::create_dir_all(root.join("config/maps")).unwrap();
 
-        // Link plugins
         util::symlink_file(
             params.root.join(".bin/CorePlugin.jar"),
             root.join("config/mods/CorePlugin.jar"),
         )
         .unwrap();
         util::symlink_file(
-            params.root.join(".bin/LightweightHub.jar"),
-            root.join("config/mods/LightweightHub.jar"),
+            params.root.join(".bin/Newtd.jar"),
+            root.join("config/mods/Newtd.jar"),
         )
         .unwrap();
 
-        // Copy test map
         fs::copy(
-            params.root.join("hub/assets/testmap.msav"),
+            params.root.join("newtd/assets/testmap.msav"),
             root.join("config/maps/testmap.msav"),
         )
         .unwrap();
 
-        // Create plugin configuration
         fs::write(
             root.join("config/corePlugin.toml"),
             format!(
-                "serverName = \"hub\"\ngamemode = \"hub\"\nsharedConfigPath = {:?}",
+                r#"
+                serverName = "newtd"
+                gamemode = "newtd"
+                sharedConfigPath = {:?}
+                "#,
                 params.root.join(".run/sharedConfig.toml")
             ),
         )
@@ -93,7 +78,6 @@ impl TargetImpl for Impl {
 
         let port = params.next_port();
 
-        // Create Mindustry settings
         {
             let mut contents = vec![];
             contents.extend_from_slice(&3i32.to_be_bytes());
@@ -118,7 +102,7 @@ impl TargetImpl for Impl {
             contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
             contents.extend_from_slice(option.as_bytes());
 
-            let commands = "host Protohub survival";
+            let commands = "host";
             contents.push(4);
             contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
             contents.extend_from_slice(commands.as_bytes());
@@ -126,7 +110,6 @@ impl TargetImpl for Impl {
             fs::write(root.join("config/settings.bin"), contents).unwrap();
         }
 
-        // Setup Java command
         let java = deps.java.as_ref().unwrap().home().join("bin/java");
         let mindustry = deps.mindustry.as_ref().unwrap().path();
 
@@ -136,10 +119,11 @@ impl TargetImpl for Impl {
     }
 
     fn run(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
-        deps.mprocs
-            .as_ref()
-            .unwrap()
-            .spawn_task(params, &mut self.command.take().unwrap(), "hub");
+        deps.mprocs.as_ref().unwrap().spawn_task(
+            &params,
+            &mut self.command.as_mut().unwrap(),
+            "newtd",
+        );
     }
 }
 
@@ -162,12 +146,12 @@ impl TargetImplStatic for Impl {
         _: super::Targets<'_>,
         params: &mut super::InitParams,
     ) -> Option<Self> {
-        if read_dir("hub").is_err() {
+        if read_dir("newtd").is_err() {
             return None;
         }
 
-        params.java_workspace_members.push("hub".into());
-        Some(Self::new(fs::canonicalize("hub").unwrap()))
+        params.java_workspace_members.push("newtd".into());
+        Some(Self::new(fs::canonicalize("newtd").unwrap()))
     }
 
     fn initialize_local(
@@ -177,12 +161,8 @@ impl TargetImplStatic for Impl {
     ) -> Self {
         if !Command::new("git")
             .arg("clone")
-            .arg(
-                params
-                    .git_backend
-                    .repo_url("Darkdustry-Coders/LightweightHub"),
-            )
-            .arg(params.root.join("hub"))
+            .arg(params.git_backend.repo_url("Darkdustry-Coders/Newtd"))
+            .arg(params.root.join("newtd"))
             .status()
             .unwrap()
             .success()
@@ -190,6 +170,6 @@ impl TargetImplStatic for Impl {
             panic!("failed to fetch repo");
         }
 
-        Self::new(fs::canonicalize("hub").unwrap())
+        Self::new(fs::canonicalize("newtd").unwrap())
     }
 }

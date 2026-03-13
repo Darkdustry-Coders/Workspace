@@ -1,3 +1,8 @@
+//! RabbitMQ message broker target module.
+//!
+//! This module manages RabbitMQ installation and configuration
+//! for the message queue infrastructure.
+
 use std::{
     fs::{self, File},
     io::{BufWriter, Write},
@@ -9,14 +14,24 @@ use crate::util::{download, find_executable, is_executable, untar_xz};
 
 use super::{Target, TargetImpl, TargetImplStatic};
 
+/// URL for RabbitMQ generic Unix release.
 static URL: &str = "https://github.com/rabbitmq/rabbitmq-server/releases/download/v4.1.2/rabbitmq-server-generic-unix-4.1.2.tar.xz";
 
+/// RabbitMQ target implementation.
 pub struct Impl {
+    /// Path to RabbitMQ home directory.
     rabbitmq_home: PathBuf,
+    /// AMQP port number.
     port: u16,
+    /// Management plugin port number.
     management_port: u16,
 }
+
 impl Impl {
+    /// Creates a new RabbitMQ instance.
+    ///
+    /// # Arguments
+    /// * `rabbitmq_home` - Path to RabbitMQ installation
     fn new(rabbitmq_home: PathBuf) -> Self {
         Self {
             rabbitmq_home,
@@ -25,10 +40,12 @@ impl Impl {
         }
     }
 
+    /// Returns the AMQP connection URL.
     pub fn url(&self) -> String {
         format!("amqp://guest:guest@localhost:{}/%2F", self.port)
     }
 }
+
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, _: &mut super::BuildParams) {}
 
@@ -43,6 +60,7 @@ impl TargetImpl for Impl {
         let rabbitmq_root = params.root.join(".run/rabbitmq");
         fs::create_dir_all(&rabbitmq_root).unwrap();
 
+        // Create RabbitMQ configuration
         let mut config = BufWriter::new(File::create(rabbitmq_root.join("rabbitmq.conf")).unwrap());
         config
             .write_all(
@@ -55,6 +73,7 @@ impl TargetImpl for Impl {
             .unwrap();
         config.flush().unwrap();
 
+        // Enable management plugin
         let mut config =
             BufWriter::new(File::create(rabbitmq_root.join("enabled-plugins")).unwrap());
         config
@@ -88,6 +107,7 @@ impl TargetImpl for Impl {
             .spawn_task(params, &mut command, "rabbitmq");
     }
 }
+
 impl TargetImplStatic for Impl {
     fn depends(list: &mut super::TargetList) {
         list.set_depend(Target::CoreUtils);

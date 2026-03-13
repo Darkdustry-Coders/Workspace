@@ -4,6 +4,7 @@ use std::{
     ffi::{OsStr, OsString},
     io::{Write, stderr, stdin},
     ops::{Deref, DerefMut},
+    os::unix::fs::PermissionsExt,
     path::PathBuf,
     process::{Command, exit},
     str::FromStr,
@@ -69,6 +70,7 @@ impl Default for TargetFlags {
     }
 }
 
+/// Build state of a target.
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
 pub enum TargetEnabled {
     /// Target is disabled for this build.
@@ -90,6 +92,11 @@ pub enum TargetEnabled {
     Build,
 }
 impl TargetEnabled {
+    /// Upgrades the enabled state to a higher priority.
+    ///
+    /// Priority order: No < Depend < Build
+    /// # Arguments
+    /// * `enabled` - New state to upgrade to
     pub fn upgrade(&mut self, enabled: TargetEnabled) {
         *self = match (*self, enabled) {
             (Self::No, x) => x,
@@ -147,8 +154,12 @@ where
     fn initialize_local(enabled: TargetEnabled, deps: Targets<'_>, params: &mut InitParams)
     -> Self;
 }
+/// Extension trait for downcasting target implementations.
+#[allow(dead_code)]
 pub trait TargetImplExt: TargetImpl {
+    /// Attempts to cast to a specific target type.
     fn try_as<T: TargetImpl>(&self) -> Option<&T>;
+    /// Attempts to cast to a mutable specific target type.
     fn try_as_mut<T: TargetImpl>(&mut self) -> Option<&mut T>;
 }
 impl<I: TargetImpl> TargetImplExt for I {
@@ -161,15 +172,18 @@ impl<I: TargetImpl> TargetImplExt for I {
     }
 }
 
+/// Smart pointer that can hold either a borrowed or owned value.
 pub enum BorrowedMut<'a, T> {
     Borrowed(&'a mut T),
     Owned(T),
 }
 impl<'a, T> BorrowedMut<'a, T> {
+    /// Creates a new owned BorrowedMut.
     pub fn new_owned(t: T) -> Self {
         Self::Owned(t)
     }
 
+    /// Creates a new borrowed BorrowedMut.
     pub fn new_borrowed(t: &'a mut T) -> Self {
         Self::Borrowed(t)
     }
@@ -209,16 +223,25 @@ impl<'a, T> AsMut<T> for BorrowedMut<'a, T> {
     }
 }
 
+/// Parameters for target initialization.
 pub struct InitParams {
+    /// Git backend for cloning repositories.
     pub git_backend: GitBackend,
+    /// Target Mindustry version.
     pub mindustry_version: MindustryVersion,
+    /// List of Rust workspace members to add.
     pub rust_workspace_members: Vec<String>,
+    /// List of Java workspace members to add.
     pub java_workspace_members: Vec<String>,
+    /// Root path of the workspace.
     pub root: PathBuf,
+    /// Whether RabbitMQ is hosted externally.
     pub host_rabbitmq: bool,
+    /// Whether SurrealDB is hosted externally.
     pub host_surrealdb: bool,
 }
 impl InitParams {
+    /// Creates new initialization parameters from build arguments.
     pub fn new(args: &BuildArgs) -> Self {
         Self {
             git_backend: args.git_backend,
@@ -232,17 +255,28 @@ impl InitParams {
     }
 }
 
+/// Parameters for the build phase.
+#[allow(dead_code)]
 pub struct BuildParams {
+    /// Git backend for cloning repositories.
     pub git_backend: GitBackend,
+    /// Target Mindustry version.
     pub mindustry_version: MindustryVersion,
+    /// Environment variables to set during build.
     pub env: HashMap<OsString, OsString>,
+    /// PATH directories for build commands.
     pub path: Vec<PathBuf>,
+    /// Root path of the workspace.
     pub root: PathBuf,
+    /// Enable Java stacktrace output.
     pub java_stacktrace: bool,
+    /// Whether RabbitMQ is hosted externally.
     pub host_rabbitmq: bool,
+    /// Whether SurrealDB is hosted externally.
     pub host_surrealdb: bool,
 }
 impl BuildParams {
+    /// Creates new build parameters from initialization parameters and arguments.
     pub fn new(params: InitParams, args: &BuildArgs) -> Self {
         Self {
             git_backend: params.git_backend,
@@ -284,6 +318,7 @@ impl BuildParams {
         cmd
     }
 
+    /// Creates a gradle command with appropriate wrapper.
     pub fn gradle(&mut self) -> Command {
         let gradle = {
             #[cfg(unix)]
@@ -302,17 +337,64 @@ impl BuildParams {
         }
         cmd
     }
+
+    pub fn cargo(&mut self) -> Command {
+        let cargo = self.path.iter().find_map(|path| {
+            if path.is_dir()
+                && let Ok(mut read_dir) = path.read_dir()
+            {
+                read_dir.find_map(|member| {
+                    if let Ok(member) = member
+                        && let Ok(member_file_type) = member.file_type()
+                        && member_file_type.is_file()
+                        && member.file_name() == "cargo"
+                    {
+                        #[cfg(target_os = "linux")]
+                        {
+                            Some(member.path())
+                        }
+                        #[cfg(target_os = "windows")]
+                        {
+                            Some(member.path())
+                        }
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            }
+        });
+
+        match cargo {
+            Some(cargo) => self.cmd(cargo),
+            None => {
+                eprintln!("Can't find cargo on you system. Do you have correctly installed rust?");
+                exit(1);
+            }
+        }
+    }
 }
 
+/// Parameters for the run phase.
 pub struct RunParams {
+    /// Environment variables for running processes.
     pub env: HashMap<OsString, OsString>,
+    /// PATH directories for running commands.
     pub path: Vec<PathBuf>,
+    /// Next available port number.
     pub port: u16,
+    /// Root path of the workspace.
     pub root: PathBuf,
+    /// Whether RabbitMQ is hosted externally.
     pub host_rabbitmq: bool,
+    /// Whether SurrealDB is hosted externally.
     pub host_surrealdb: bool,
+
+    pub templates: HashMap<String, PathBuf>,
 }
 impl RunParams {
+    /// Creates new run parameters from build parameters and arguments.
     pub fn new(params: BuildParams, args: &BuildArgs) -> Self {
         Self {
             env: params.env,
@@ -321,9 +403,11 @@ impl RunParams {
             root: params.root,
             host_rabbitmq: !args.rabbitmq_url.is_empty(),
             host_surrealdb: !args.surrealdb_url.is_empty(),
+            templates: args.templates.clone(),
         }
     }
 
+    /// Returns the next available port and increments the counter.
     pub fn next_port(&mut self) -> u16 {
         let port = self.port;
         self.port += 1;
@@ -349,6 +433,42 @@ impl RunParams {
         cmd.envs(&self.env);
         cmd.env("PATH", path);
         cmd
+    }
+    pub fn cargo(&mut self) -> Command {
+        let cargo = self.path.iter().find_map(|path| {
+            if path.is_dir()
+                && let Ok(mut read_dir) = path.read_dir()
+            {
+                read_dir.find_map(|member| {
+                    if let Ok(member) = member
+                        && let Ok(member_file_type) = member.file_type()
+                        && member_file_type.is_file()
+                        && member.file_name() == "cargo"
+                    {
+                        #[cfg(target_os = "linux")]
+                        {
+                            Some(member.path())
+                        }
+                        #[cfg(target_os = "windows")]
+                        {
+                            Some(member.path())
+                        }
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            }
+        });
+
+        match cargo {
+            Some(cargo) => self.cmd(cargo),
+            None => {
+                eprintln!("Can't find cargo on you system. Do you have correctly installed rust?");
+                exit(1);
+            }
+        }
     }
 }
 
@@ -555,4 +675,7 @@ targets! {
     hub: Hub;
 
     hexed: Hexed;
+    newtd: Newtd;
+    mindurkabot: MindurkaBot;
+    mindurkansfwdetector: MindurkaNsfwDetector;
 }

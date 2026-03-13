@@ -1,5 +1,8 @@
+/// Command line argument parsing module.
 mod args;
+/// Build targets module.
 mod targets;
+/// Utility functions module.
 mod util;
 
 use std::{
@@ -17,6 +20,10 @@ use util::CURRENT_DIR;
 
 use crate::util::write_if_diff;
 
+/// Entry point of the buildscript application.
+///
+/// Parses command line arguments, initializes the environment,
+/// and executes the requested build or run command.
 fn main() {
     unsafe {
         CURRENT_DIR = Some(current_dir().unwrap());
@@ -167,19 +174,19 @@ fn main() {
 
             let mut params = BuildParams::new(params, &build);
 
+            if env != EnvTy::Isolate {
+                params.path.extend(
+                    std::env::var("PATH")
+                        .unwrap()
+                        .split(if cfg!(unix) { ':' } else { ';' })
+                        .map(PathBuf::from),
+                );
+            }
+
             targets.build_all(&mut params);
 
             if run {
                 let mut params = RunParams::new(params, &build);
-
-                if env != EnvTy::Isolate {
-                    params.path.extend(
-                        std::env::var("PATH")
-                            .unwrap()
-                            .split(if cfg!(unix) { ':' } else { ';' })
-                            .map(PathBuf::from),
-                    );
-                }
 
                 // if env == EnvTy::Isolate {
                 //     if cfg!(unix) {

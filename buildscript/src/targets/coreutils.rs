@@ -1,21 +1,30 @@
+//! OS coreutils target module.
+//!
+//! This module provides core Unix utilities through busybox.
+//! It's used as a fallback when system coreutils are not available.
+
 use std::{
     fs::{self, read_dir},
     path::{Path, PathBuf},
     process::Command,
 };
 
-use crate::util::{self, download, find_executable, is_executable, untar_gz};
+use crate::util::{self, download, find_executable, is_executable};
 
 use super::{TargetFlags, TargetImpl, TargetImplStatic};
 
+/// URL for the busybox binary (Linux x86_64 musl).
 const LINUX_BIN: &str = "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox";
 
+/// Coreutils target implementation using busybox.
 pub struct Impl(PathBuf);
+
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
         params.path.push(self.0.clone());
     }
 }
+
 impl TargetImplStatic for Impl {
     fn flags() -> TargetFlags {
         TargetFlags {
@@ -32,7 +41,7 @@ impl TargetImplStatic for Impl {
         if cfg!(unix) {
             let path = find_executable("xargs")?;
             let path = path.parent()?;
-            // Surely that's enough
+            // Verify core utilities are available
             for x in ["uname", "yes", "[", "cat", "touch"] {
                 if !is_executable(path.join(x)) {
                     return None;
@@ -75,6 +84,7 @@ impl TargetImplStatic for Impl {
             fs::set_permissions(".cache/tools/coreutils/busybox", permissions).unwrap();
         }
 
+        // Parse busybox help to get available commands
         let commands = String::from_utf8(
             Command::new(".cache/tools/coreutils/busybox")
                 .env("LANG", "C")
@@ -90,6 +100,7 @@ impl TargetImplStatic for Impl {
             .skip(1)
             .flat_map(|x| x.split(',').map(str::trim).filter(|x| !x.is_empty()));
 
+        // Create symlinks for all busybox commands
         let coreutils = path.join("busybox");
         for x in commands {
             util::symlink_file(&coreutils, Path::new(".cache/tools/coreutils").join(x)).unwrap();

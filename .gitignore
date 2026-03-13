@@ -13,3 +13,17 @@
 /.project
 /erl_crash.dump
 /assets/shared.settings.gradle
+/coreplugin
+/hexed
+/newtd
+.direnv/
+.idea/
+.vite/
+MindurkaCompat/
+config.toml.tera
+forts/
+hub/
+mindurka-bot/
+mindurka-frontend/
+mindurka-nsfw-detector/
+mindurka-rabbitmq-rust/
