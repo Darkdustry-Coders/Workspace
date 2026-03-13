@@ -12,6 +12,7 @@ use std::{
 
 use crate::{
     args::{BuildArgs, EnvTy, GitBackend, MindustryVersion},
+    syncfs::SyncFs,
     util::current_dir,
 };
 
@@ -392,10 +393,16 @@ pub struct RunParams {
     pub host_surrealdb: bool,
 
     pub templates: HashMap<String, PathBuf>,
+    pub run: SyncFs,
 }
 impl RunParams {
     /// Creates new run parameters from build parameters and arguments.
     pub fn new(params: BuildParams, args: &BuildArgs) -> Self {
+        let mut run = SyncFs::new(".run".into());
+        args.keep_states
+            .iter()
+            .for_each(|x| run.keep_path(x.clone()));
+
         Self {
             env: params.env,
             path: params.path,
@@ -404,6 +411,7 @@ impl RunParams {
             host_rabbitmq: !args.rabbitmq_url.is_empty(),
             host_surrealdb: !args.surrealdb_url.is_empty(),
             templates: args.templates.clone(),
+            run,
         }
     }
 

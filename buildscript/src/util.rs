@@ -6,8 +6,9 @@
 #![allow(unused)]
 
 use std::{
-    fs::{self, metadata, File},
-    io::{self, stderr, IsTerminal, Read, Write},
+    fs::{self, File, metadata},
+    io::{self, IsTerminal, Read, Write, stderr},
+    mem::transmute,
     ops::{Div, Mul},
     path::{Path, PathBuf},
     process::Command,
@@ -125,15 +126,17 @@ macro_rules! exe_path {
         $expr
     };
 }
-/// Checks if a file is executable.
+/// Obtain an executable path.
 ///
-/// On Unix, checks if the file has execute permissions.
-///
-/// # Arguments
-/// * `path` - Path to the file
-///
-/// # Returns
-/// true if the file is executable
+/// This will insert a `.exe` on Windows.
+#[cfg(windows)]
+#[macro_export]
+macro_rules! exe_path {
+    ($expr:expr) => {
+        concat!($expr, ".exe")
+    };
+}
+
 #[cfg(unix)]
 pub fn is_executable(path: impl AsRef<Path>) -> bool {
     let path = path.as_ref();
@@ -395,14 +398,33 @@ pub fn symlink_file(source: impl AsRef<Path>, dest: impl AsRef<Path>) -> std::io
     std::os::unix::fs::symlink(source, dest)
 }
 
-/// Obtain an executable path.
-///
-/// This will insert a `.exe` on Windows.
-#[cfg(windows)]
-#[macro_export]
-macro_rules! exe_path {
-    ($expr:expr) => {
-        concat!($expr, ".exe")
-    };
+#[cfg(unix)]
+pub fn symlink_dir(source: impl AsRef<Path>, dest: impl AsRef<Path>) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(source, dest)
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PopChildError;
+
+pub trait PathBufExt {
+    fn pop_child(&mut self) -> Result<(), PopChildError>;
+}
+impl PathBufExt for PathBuf {
+    fn pop_child(&mut self) -> Result<(), PopChildError> {
+        let len = match self.parent() {
+            Some(x) => x,
+            None => return Err(PopChildError),
+        }
+        .as_os_str()
+        .len();
+
+        unsafe {
+            let buf: &mut Vec<u8> = transmute(self.as_mut_os_string());
+            buf.set_len(len);
+        }
+
+        Ok(())
+    }
+}
+
 // TODO: Implement for Windows
