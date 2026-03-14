@@ -105,4 +105,6 @@ impl TargetImplStatic for Impl {
 
         Self(fs::canonicalize(".cache/tools/coreutils").unwrap())
     }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, _: &mut super::InitParams) {}
 }

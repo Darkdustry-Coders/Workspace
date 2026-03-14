@@ -1,4 +1,5 @@
 mod args;
+mod fs2;
 mod syncfs;
 mod targets;
 mod util;

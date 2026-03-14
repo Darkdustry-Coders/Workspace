@@ -145,13 +145,12 @@ impl TargetImplStatic for Impl {
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        params: &mut super::InitParams,
+        _: &mut super::InitParams,
     ) -> Option<Self> {
         if read_dir("hub").is_err() {
             return None;
         }
 
-        params.java_workspace_members.push("hub".into());
         Some(Self::new(fs::canonicalize("hub").unwrap()))
     }
 
@@ -176,5 +175,11 @@ impl TargetImplStatic for Impl {
         }
 
         Self::new(fs::canonicalize("hub").unwrap())
+    }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, params: &mut super::InitParams) {
+        if fs::read_dir("hub").is_ok() {
+            params.java_workspace_members.push("hub".into());
+        }
     }
 }

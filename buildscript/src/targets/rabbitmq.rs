@@ -169,4 +169,6 @@ impl TargetImplStatic for Impl {
 
         Self::new(fs::canonicalize(dir).unwrap())
     }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, _: &mut super::InitParams) {}
 }

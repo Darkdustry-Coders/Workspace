@@ -77,13 +77,12 @@ impl TargetImplStatic for Impl {
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        params: &mut super::InitParams,
+        _: &mut super::InitParams,
     ) -> Option<Self> {
         if read_dir("coreplugin").is_err() {
             return None;
         }
 
-        params.java_workspace_members.push("coreplugin".into());
         Some(Self::new(fs::canonicalize("coreplugin").unwrap()))
     }
 
@@ -104,5 +103,11 @@ impl TargetImplStatic for Impl {
         }
 
         Self::new(fs::canonicalize("coreplugin").unwrap())
+    }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, params: &mut super::InitParams) {
+        if fs::read_dir("coreplugin").is_ok() {
+            params.java_workspace_members.push("coreplugin".into());
+        }
     }
 }

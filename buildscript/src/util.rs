@@ -6,6 +6,9 @@
 #![allow(unused)]
 
 use std::{
+    backtrace::Backtrace,
+    error::Error as DynError,
+    fmt,
     fs::{self, File, metadata},
     io::{self, IsTerminal, Read, Write, stderr},
     mem::transmute,
@@ -13,6 +16,77 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+
+/// Error that has a backtrace and an argument.
+pub struct Backtraced<E: DynError> {
+    error: E,
+    backtrace: Backtrace,
+}
+impl<E: DynError> Backtraced<E> {
+    /// Add backtrace to the error.
+    pub fn new(error: E) -> Self {
+        Self {
+            error,
+            backtrace: Backtrace::force_capture(),
+        }
+    }
+
+    /// Convert this into raw components.
+    pub fn into_inner(self) -> (E, Backtrace) {
+        (self.error, self.backtrace)
+    }
+
+    /// Obtain the backtrace.
+    pub const fn backtrace(&self) -> &Backtrace {
+        &self.backtrace
+    }
+
+    /// Obtain the error.
+    pub const fn error(&self) -> &E {
+        &self.error
+    }
+}
+impl<E: DynError> fmt::Display for Backtraced<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.error, f)?;
+        f.write_str("\n")?;
+        fmt::Display::fmt(&self.backtrace, f)
+    }
+}
+impl<E: DynError> fmt::Debug for Backtraced<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.error, f)
+    }
+}
+impl<E: DynError> DynError for Backtraced<E> {}
+
+pub trait ErrorExt: DynError {
+    fn with_backtrace(self) -> Backtraced<Self>
+    where
+        Self: Sized;
+}
+impl<T: DynError> ErrorExt for T {
+    fn with_backtrace(self) -> Backtraced<Self>
+    where
+        Self: Sized,
+    {
+        Backtraced::new(self)
+    }
+}
+
+pub trait ResultExt<T, E: DynError> {
+    fn with_backtrace(self) -> Result<T, Backtraced<E>>
+    where
+        Self: Sized;
+}
+impl<T, E: DynError> ResultExt<T, E> for Result<T, E> {
+    fn with_backtrace(self) -> Result<T, Backtraced<E>>
+    where
+        Self: Sized,
+    {
+        self.map_err(|x| x.with_backtrace())
+    }
+}
 
 /// Global current directory storage (initialized at startup).
 pub static mut CURRENT_DIR: Option<PathBuf> = None;
@@ -177,6 +251,28 @@ pub fn find_executable(cmd: impl AsRef<std::ffi::OsStr>) -> Option<PathBuf> {
     });
 
     for path in path.map(|x| PathBuf::from(x.as_str()).join(cmd.as_ref())) {
+        if is_executable(&path) {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+/// Finds an executable in the system PATH.
+///
+/// # Arguments
+/// * `cmd` - Command name to find
+///
+/// # Returns
+/// Full path to the executable if found, None otherwise
+#[cfg(unix)]
+pub fn find_executable_on_path<S: AsRef<std::path::Path>>(
+    cmd: impl AsRef<std::ffi::OsStr>,
+    path: impl IntoIterator<Item = S>,
+) -> Option<PathBuf> {
+    for path in path {
+        let path = path.as_ref().join(cmd.as_ref());
         if is_executable(&path) {
             return Some(path);
         }

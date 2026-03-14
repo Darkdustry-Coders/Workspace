@@ -144,13 +144,12 @@ impl TargetImplStatic for Impl {
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        params: &mut super::InitParams,
+        _: &mut super::InitParams,
     ) -> Option<Self> {
         if read_dir("newtd").is_err() {
             return None;
         }
 
-        params.java_workspace_members.push("newtd".into());
         Some(Self::new(fs::canonicalize("newtd").unwrap()))
     }
 
@@ -171,5 +170,11 @@ impl TargetImplStatic for Impl {
         }
 
         Self::new(fs::canonicalize("newtd").unwrap())
+    }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, params: &mut super::InitParams) {
+        if fs::read_dir("newtd").is_ok() {
+            params.java_workspace_members.push("newtd".into());
+        }
     }
 }

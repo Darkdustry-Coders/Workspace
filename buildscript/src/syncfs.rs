@@ -1,12 +1,15 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
-    fs::{self, ReadDir},
+    fs::{self},
     io,
     path::PathBuf,
 };
 
-use crate::util::{self, PathBufExt};
+use crate::{
+    fs2::{self, ReadDir},
+    util::{self, Backtraced, ErrorExt, PathBufExt, ResultExt},
+};
 
 pub struct SyncFs {
     root: PathBuf,
@@ -49,17 +52,17 @@ impl SyncFs {
         self.links.insert(dest, source);
     }
 
-    pub fn finalize(&self) -> io::Result<()> {
+    pub fn finalize(&self) -> Result<(), Backtraced<io::Error>> {
         struct StackFrame {
-            pub readdir: ReadDir,
+            pub readdir: ReadDir<PathBuf>,
             pub keep: bool,
         }
 
         'part1: {
-            let readdir = match fs::read_dir(&self.root) {
+            let readdir = match fs2::read_dir(self.root.clone()) {
                 Ok(x) => x,
                 Err(why) if why.kind() == io::ErrorKind::NotFound => break 'part1,
-                Err(why) => return Err(why),
+                Err(why) => return Err(why.with_backtrace()),
             };
 
             let mut rpath = PathBuf::new();
@@ -71,7 +74,7 @@ impl SyncFs {
             while let Some(frame) = stack.last_mut() {
                 let file = match frame.readdir.next() {
                     Some(Ok(x)) => x,
-                    Some(Err(why)) => return Err(why),
+                    Some(Err(why)) => return Err(why.with_backtrace()),
                     None => {
                         let done_frame = stack.pop().unwrap();
                         if let Some(prev_frame) = stack.last_mut() {
@@ -116,7 +119,7 @@ impl SyncFs {
                 }
 
                 let fpath = file.path();
-                match fs::read_dir(&fpath) {
+                match fs2::read_dir(fpath.clone()) {
                     Ok(readdir) => {
                         stack.push(StackFrame {
                             readdir,
@@ -124,10 +127,10 @@ impl SyncFs {
                         });
                     }
                     Err(why) if why.kind() == io::ErrorKind::NotADirectory => {
-                        fs::remove_file(fpath)?;
+                        fs2::remove_file(fpath).with_backtrace()?;
                         assert!(rpath.pop_child().is_ok());
                     }
-                    Err(why) => return Err(why),
+                    Err(why) => return Err(why.with_backtrace()),
                 }
             }
         }
@@ -142,13 +145,13 @@ impl SyncFs {
                 continue;
             }
 
-            match fs::write(&path, value) {
+            match fs2::write(&path, value) {
                 Ok(x) => x,
                 Err(why) if why.kind() == io::ErrorKind::NotFound => {
-                    fs::create_dir_all(path.parent().unwrap())?;
-                    fs::write(&path, value)?;
+                    fs2::create_dir_all(path.parent().unwrap()).with_backtrace()?;
+                    fs2::write(&path, value).with_backtrace()?;
                 }
-                Err(why) => return Err(why),
+                Err(why) => return Err(why.with_backtrace()),
             }
         }
 
@@ -162,22 +165,22 @@ impl SyncFs {
             let realdest = {
                 let mut path = Cow::Borrowed(&dest);
                 loop {
-                    match fs::read_link(path.as_ref()) {
+                    match fs2::read_link(path.as_ref()) {
                         Ok(x) => path = Cow::Owned(x),
                         Err(why) if why.kind() == io::ErrorKind::InvalidInput => break path,
                         Err(why) if why.kind() == io::ErrorKind::NotFound => break path,
-                        Err(why) => return Err(why),
+                        Err(why) => return Err(why.with_backtrace()),
                     }
                 }
             };
             let realsource = {
                 let mut path = Cow::Borrowed(source);
                 loop {
-                    match fs::read_link(path.as_ref()) {
+                    match fs2::read_link(path.as_ref()) {
                         Ok(x) => path = Cow::Owned(x),
                         Err(why) if why.kind() == io::ErrorKind::InvalidInput => break path,
                         Err(why) if why.kind() == io::ErrorKind::NotFound => break path,
-                        Err(why) => return Err(why),
+                        Err(why) => return Err(why.with_backtrace()),
                     }
                 }
             };
@@ -186,8 +189,8 @@ impl SyncFs {
                 continue;
             }
 
-            match fs::metadata(realdest.as_ref()) {
-                Ok(dest_meta) => match fs::metadata(realsource.as_ref()) {
+            match fs2::metadata(realdest.as_ref()) {
+                Ok(dest_meta) => match fs2::metadata(realsource.as_ref()) {
                     Ok(source_meta) => {
                         #[cfg(unix)]
                         {
@@ -201,42 +204,44 @@ impl SyncFs {
                         }
                     }
                     Err(why) if why.kind() == io::ErrorKind::NotFound => (),
-                    Err(why) => return Err(why),
+                    Err(why) => return Err(why.with_backtrace()),
                 },
                 Err(why) if why.kind() == io::ErrorKind::NotFound => (),
-                Err(why) => return Err(why),
+                Err(why) => return Err(why.with_backtrace()),
             }
 
-            match fs::remove_file(&dest) {
+            match fs2::remove_file(&dest) {
                 Ok(_) => (),
                 Err(why) if why.kind() == io::ErrorKind::NotFound => (),
-                Err(why) if why.kind() == io::ErrorKind::IsADirectory => fs::remove_dir_all(&dest)?,
-                Err(why) => return Err(why),
+                Err(why) if why.kind() == io::ErrorKind::IsADirectory => {
+                    fs2::remove_dir_all(&dest).with_backtrace()?
+                }
+                Err(why) => return Err(why.with_backtrace()),
             }
 
-            match fs::hard_link(source, &dest) {
+            match fs2::hard_link(source, &dest) {
                 Ok(_) => continue,
                 Err(why) if why.kind() == io::ErrorKind::NotFound => {
-                    fs::create_dir_all(dest.parent().unwrap())?;
-                    match fs::hard_link(source, &dest) {
+                    fs2::create_dir_all(dest.parent().unwrap()).with_backtrace()?;
+                    match fs2::hard_link(source, &dest) {
                         Ok(_) => continue,
                         Err(why) if why.kind() == io::ErrorKind::IsADirectory => (),
-                        Err(why) => return Err(why),
+                        Err(why) => return Err(why.with_backtrace()),
                     }
                 }
                 Err(why) if why.kind() == io::ErrorKind::IsADirectory => (),
-                Err(why) => return Err(why),
+                Err(why) => return Err(why.with_backtrace()),
             }
 
             match util::symlink_file(source, &dest) {
                 Ok(_) => (),
                 Err(why) if why.kind() == io::ErrorKind::IsADirectory => {}
-                Err(why) => return Err(why),
+                Err(why) => return Err(why.with_backtrace()),
             }
 
             match util::symlink_dir(source, &dest) {
                 Ok(_) => (),
-                Err(why) => return Err(why),
+                Err(why) => return Err(why.with_backtrace()),
             }
         }
 

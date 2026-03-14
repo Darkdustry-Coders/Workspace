@@ -153,7 +153,6 @@ impl TargetImplStatic for Impl {
             return None;
         }
 
-        params.java_workspace_members.push("forts".into());
         Some(Self::new(fs::canonicalize("forts").unwrap()))
     }
 
@@ -174,5 +173,11 @@ impl TargetImplStatic for Impl {
         }
 
         Self::new(fs::canonicalize("forts").unwrap())
+    }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, params: &mut super::InitParams) {
+        if fs::read_dir("forts").is_ok() {
+            params.java_workspace_members.push("forts".into());
+        }
     }
 }

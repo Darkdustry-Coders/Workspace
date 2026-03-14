@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, File, read_dir},
+    fs::{self, read_dir},
     path::PathBuf,
     process::Command,
 };
@@ -8,6 +8,7 @@ use serde::Serialize;
 use tera::{Context, Tera};
 
 use crate::{
+    exe_path,
     targets::{Target, TargetImpl, TargetImplStatic},
     util::current_dir,
 };
@@ -22,21 +23,20 @@ pub struct Impl {
     repo: PathBuf,
     #[allow(unused)]
     path: PathBuf,
-    command: Option<Command>,
 }
 
 impl Impl {
     fn new(path: PathBuf) -> Self {
         Self {
             repo: path,
-            path: current_dir().join(".bin/Newtd.jar"),
-            command: None,
+            path: current_dir().join(exe_path!(".bin/mindurka-bot")),
         }
     }
 }
 
 impl TargetImpl for Impl {
     fn build(&mut self, _deps: super::Targets<'_>, params: &mut super::BuildParams) {
+        // TODO: Add --release flag for building in release mode.
         if !params
             .cargo()
             .args(["build", "--release", "-p", "mindurka-bot"])
@@ -46,14 +46,15 @@ impl TargetImpl for Impl {
         {
             panic!("Building mindurka-bot failed")
         }
+
+        fs::rename(
+            exe_path!(".cache/rust/release/mindurka-bot"),
+            exe_path!(".bin/mindurka-bot"),
+        )
+        .expect("failed to move bot binary");
     }
 
     fn run_init(&mut self, _deps: super::Targets<'_>, params: &mut super::RunParams) {
-        let root = params.root.join(".run/mindurka-bot");
-        fs::create_dir_all(&root).unwrap();
-
-        let config = root.join("config.toml");
-        fs::File::create(&config).expect("Failed to create config file");
         if let Some(template) = params.templates.get("mindurka-bot") {
             let mut tera = Tera::default();
             tera.add_template_files([(template, Some("mindurka-bot"))])
@@ -67,39 +68,27 @@ impl TargetImpl for Impl {
             let config_content = tera
                 .render("mindurka-bot", &context)
                 .expect("Failed to render template");
-            fs::write(&config, config_content).expect("Failed to write rendered config");
+            params.run.write("mindurka-bot/config.toml", config_content);
         } else {
-            fs::write(
-                &config,
+            params.run.write(
+                "mindurka-bot/config.toml",
                 format!(
                     r#"
-                shared_config_path = {:?}
-                "#,
-                    params.root.join(".run/sharedConfig.toml")
+                    shared_config_path = {:?}
+                    "#,
+                    params.root.join("mindurka-bot/config.toml")
                 ),
-            )
-            .unwrap();
+            );
         }
-
-        let mut cmd = params.cargo();
-        cmd.current_dir(root)
-            .args([
-                "run",
-                "--release",
-                "-p",
-                "mindurka-bot",
-                "--",
-                "-c",
-                config.to_str().unwrap(),
-            ])
-            .env("RUST_LOG", "info");
-        self.command = Some(cmd);
     }
 
     fn run(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
+        let mut cmd = params.cmd(&self.path);
         deps.mprocs.as_ref().unwrap().spawn_task(
             &params,
-            &mut self.command.as_mut().unwrap(),
+            cmd.current_dir(".run/mindurka-bot")
+                .arg("-c")
+                .arg("config.toml"),
             "mindurka-bot",
         );
     }
@@ -122,13 +111,12 @@ impl TargetImplStatic for Impl {
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        params: &mut super::InitParams,
+        _: &mut super::InitParams,
     ) -> Option<Self> {
         if read_dir("mindurka-bot").is_err() {
             return None;
         }
 
-        params.rust_workspace_members.push("mindurka-bot".into());
         Some(Self::new(fs::canonicalize("mindurka-bot").unwrap()))
     }
 
@@ -149,5 +137,11 @@ impl TargetImplStatic for Impl {
         }
 
         Self::new(fs::canonicalize("mindurka-bot").unwrap())
+    }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, params: &mut super::InitParams) {
+        if fs::read_dir("mindurka-bot").is_ok() {
+            params.rust_workspace_members.push("mindurka-bot".into());
+        }
     }
 }

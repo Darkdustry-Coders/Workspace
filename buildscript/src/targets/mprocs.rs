@@ -171,4 +171,6 @@ impl TargetImplStatic for Impl {
             process: None,
         }
     }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, _: &mut super::InitParams) {}
 }

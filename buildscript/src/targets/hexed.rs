@@ -153,13 +153,12 @@ impl TargetImplStatic for Impl {
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        params: &mut super::InitParams,
+        _: &mut super::InitParams,
     ) -> Option<Self> {
         if read_dir("hexed").is_err() {
             return None;
         }
 
-        params.java_workspace_members.push("hexed".into());
         Some(Self::new(fs::canonicalize("hexed").unwrap()))
     }
 
@@ -180,5 +179,11 @@ impl TargetImplStatic for Impl {
         }
 
         Self::new(fs::canonicalize("hexed").unwrap())
+    }
+
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, params: &mut super::InitParams) {
+        if fs::read_dir("hexed").is_ok() {
+            params.java_workspace_members.push("hexed".into());
+        }
     }
 }

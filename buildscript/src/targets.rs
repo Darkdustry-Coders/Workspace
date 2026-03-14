@@ -2,6 +2,7 @@ use std::{
     any::Any,
     collections::HashMap,
     ffi::{OsStr, OsString},
+    fs,
     io::{Write, stderr, stdin},
     ops::{Deref, DerefMut},
     path::PathBuf,
@@ -12,7 +13,7 @@ use std::{
 use crate::{
     args::{BuildArgs, EnvTy, GitBackend, MindustryVersion},
     syncfs::SyncFs,
-    util::current_dir,
+    util::{self, current_dir},
 };
 
 /// List of target flags.
@@ -153,6 +154,13 @@ where
     /// Initialize target locally.
     fn initialize_local(enabled: TargetEnabled, deps: Targets<'_>, params: &mut InitParams)
     -> Self;
+
+    /// Check the environment and add the appropriate init parametets.
+    ///
+    /// This function is called after all targets have been initialized and the final parameters
+    /// can be assembled. It's also called on inactive targets so even if a target is not
+    /// explicitly enabled, it is kepts as a subproject in workspaces.
+    fn postinit(enabled: TargetEnabled, deps: Targets<'_>, params: &mut InitParams) {}
 }
 /// Extension trait for downcasting target implementations.
 #[allow(dead_code)]
@@ -339,40 +347,9 @@ impl BuildParams {
     }
 
     pub fn cargo(&mut self) -> Command {
-        let cargo = self.path.iter().find_map(|path| {
-            if path.is_dir()
-                && let Ok(mut read_dir) = path.read_dir()
-            {
-                read_dir.find_map(|member| {
-                    if let Ok(member) = member
-                        && let Ok(member_file_type) = member.file_type()
-                        && member_file_type.is_file()
-                        && member.file_name() == "cargo"
-                    {
-                        #[cfg(target_os = "linux")]
-                        {
-                            Some(member.path())
-                        }
-                        #[cfg(target_os = "windows")]
-                        {
-                            Some(member.path())
-                        }
-                    } else {
-                        None
-                    }
-                })
-            } else {
-                None
-            }
-        });
-
-        match cargo {
-            Some(cargo) => self.cmd(cargo),
-            None => {
-                eprintln!("Can't find cargo on you system. Do you have correctly installed rust?");
-                exit(1);
-            }
-        }
+        let cargo = util::find_executable_on_path("cargo", &self.path)
+            .expect("Could not find cargo executable");
+        self.cmd(cargo)
     }
 }
 
@@ -442,40 +419,9 @@ impl RunParams {
         cmd
     }
     pub fn cargo(&mut self) -> Command {
-        let cargo = self.path.iter().find_map(|path| {
-            if path.is_dir()
-                && let Ok(mut read_dir) = path.read_dir()
-            {
-                read_dir.find_map(|member| {
-                    if let Ok(member) = member
-                        && let Ok(member_file_type) = member.file_type()
-                        && member_file_type.is_file()
-                        && member.file_name() == "cargo"
-                    {
-                        #[cfg(target_os = "linux")]
-                        {
-                            Some(member.path())
-                        }
-                        #[cfg(target_os = "windows")]
-                        {
-                            Some(member.path())
-                        }
-                    } else {
-                        None
-                    }
-                })
-            } else {
-                None
-            }
-        });
-
-        match cargo {
-            Some(cargo) => self.cmd(cargo),
-            None => {
-                eprintln!("Can't find cargo on you system. Do you have correctly installed rust?");
-                exit(1);
-            }
-        }
+        let cargo = util::find_executable_on_path("cargo", &self.path)
+            .expect("Could not find cargo executable");
+        self.cmd(cargo)
     }
 }
 
@@ -625,6 +571,13 @@ macro_rules! targets {
                             unreachable!();
                         }
                     };
+                )*
+                $(
+                    $name::Impl::postinit(
+                        recipe.$name,
+                        self.target_deps(Target::$enumname).1,
+                        params,
+                    );
                 )*
             }
 
