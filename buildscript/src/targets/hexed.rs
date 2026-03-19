@@ -10,7 +10,7 @@ use std::{
     process::Command,
 };
 
-use crate::util::{self, current_dir};
+use crate::util::current_dir;
 
 use super::{Target, TargetImpl, TargetImplStatic};
 

@@ -50,15 +50,21 @@ define field profile on mindustry_user type record<mindustry_profile>;
 define table mindustry_profile schemafull;
 define field user on mindustry_profile type record<user>;
 define index mindustry_profile_user_index on mindustry_profile fields user;
-define field playTime on mindustry_profile type duration default 0s;
-define field blocksPlaced on mindustry_profile type int default 0;
-define field blocksBroken on mindustry_profile type int default 0;
+# Displayed play time. This value is used for ranks.
+define field play_time on mindustry_profile type duration default 0s;
+# Actual play time. This value is only visible to admins.
+define field total_play_time on mindustry_profile type duration default 0s;
+define field blocks_placed on mindustry_profile type int default 0;
+define field blocks_broken on mindustry_profile type int default 0;
 define field waves on mindustry_profile type int default 0;
 define field key on mindustry_profile type option<bytes>;
 define index mindustry_profile_key_index on mindustry_profile fields key unique;
 define field short_id on mindustry_profile type option<int> default none;
+define index mindustry_profile_short_id_index on mindustry_profile fields short_id unique;
 define field last_joined on mindustry_profile type datetime default time::now();
 define field last_name on mindustry_profile type string default "";
+# A name set with /nick.
+define field set_name on mindustry_profile type option<string> default none;
 # See [doc/account-disabled-codes.md]
 define field disabled on mindustry_profile type int default 0;
 define field ranks on mindustry_profile type array<record<rank>> default [];
@@ -69,6 +75,7 @@ define field id on mindustry_profile_gamemode type [record<mindustry_profile>, s
 define field wins on mindustry_profile_gamemode type int default 0;
 define field ovas on mindustry_profile_gamemode type int default 0;
 define field rank on mindustry_profile_gamemode type int default 0;
+define field games on mindustry_profile_gamemode type int default 0;
 
 define table mindustry_votekick schemafull;
 define field user on mindustry_votekick type record<user>;
@@ -138,12 +145,25 @@ define field hosting on ip_info type bool;
 define field proxy on ip_info type bool;
 
 define function fn::mindustry_fetch_user($search: string, $check_uuid: bool) {
+    # TODO: Replace this with a proper int conversion.
+    let $x = select * from only mindustry_profile where shortId != none && type::string(short_id) == $search;
+    if $x != none {
+        return {
+            name: $x.last_name,
+            user_id: <string> record::id($x.user),
+            profile_id: <string> record::id($x.id),
+            short_id: $x.short_id,
+            uuid: select value <string> record::id(id) from only mindustry_user where profile = $x.id limit 1,
+        };
+    };
+
     let $x = select * from only mindustry_profile where type::string(record::id(id)).ends_with($search) order by last_joined desc limit 1;
     if $x != none {
         return {
             name: $x.last_name,
             user_id: <string> record::id($x.user),
             profile_id: <string> record::id($x.id),
+            short_id: $x.short_id,
             uuid: select value <string> record::id(id) from only mindustry_user where profile = $x.id limit 1,
         };
     };
@@ -155,6 +175,7 @@ define function fn::mindustry_fetch_user($search: string, $check_uuid: bool) {
             name: $y.last_name,
             user_id: <string> record::id($y.user),
             profile_id: <string> record::id($y.id),
+            short_id: $x.short_id,
             uuid: select value <string> record::id(id) from only mindustry_user where profile = $y.id limit 1,
         };
     };
@@ -167,6 +188,7 @@ define function fn::mindustry_fetch_user($search: string, $check_uuid: bool) {
             name: $x.profile.last_name,
             user_id: <string> record::id($x.user),
             profile_id: <string> record::id($x.profile),
+            short_id: $x.short_id,
             uuid: select value <string> record::id(id) from only mindustry_user where profile = $x.id limit 1,
         };
     };
@@ -189,12 +211,15 @@ define function fn::mindustry_last_name($user: record<user>) {
     return $x.last_name + " [#dadada][[" + $id_string + "]";
 };
 
+# 0 - all ok
+# 1 - verification required
+# 2 - ban instantly
 define function fn::sus_update_obtain(
     $scopes: {
         ip: string,          ip_promised: option<bool>,
         isp: option<string>, ips_promised: option<bool>,
     },
-    $extra_sus: float) -> float
+    $extra_sus: float) -> int
 {
     let $record = type::record("sus_ip", $scopes.ip);
     let $now = time::now();
@@ -220,18 +245,36 @@ define function fn::sus_update_obtain(
             let $x = select * from only $record;
             let $passed = <float> ($now - $x.last_update).millis() / 1000;
             let $sus = math::max([0, $x.sus - $passed]);
-            let $sus = math::clamp(0, $sus + $extra_sus * 0.5, 3000);
+            let $sus = math::clamp(0, $sus + $extra_sus * 0.5, 6000);
             update only $record content { sus: $sus, last_update: $now };
             $sus
         } else {
             create only $record content {
                 last_update: $now,
-                sus: math::clamp(0, $extra_sus, 3000),
+                sus: math::clamp(0, $extra_sus, 6000),
             } return value sus
         };
     } else { 0 };
 
-    return math::max([$sus_ip]);
+    return if $sus_ip >= 2000 { 2 }
+           else if $sus_ip >= 1000 || $sus_isp >= 1000 { 1 }
+           else { 0 };
+};
+
+define function fn::mindustry_update_profile($profile: record<mindustry_profile>) -> {
+    new_short_id: option<int>,
+} {
+    let $new_short_id: option<int> = if $profile.short_id = none && ($profile.user.mindustry_permission_level > 0 ||
+        $profile.play_time > 1h) {
+        let $short_id = select value short_id from only mindustry_profile order by short_id desc limit 1;
+        let $short_id = if $short_id = none { 0 } else { $short_id + 1 };
+        update only $profile set short_id = $short_id;
+        $short_id
+    } else { none };
+
+    # TODO: Ranks.
+
+    return { new_short_id: $new_short_id };
 };
 
 define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $isp: option<string>, $server: string, $key: option<bytes>, $new_name: string) {
@@ -298,6 +341,7 @@ define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $
             short_id: $x.short_id,
             key_set: $x.key != none,
             permission_level: $x.user.mindustry_permission_level,
+            set_name: $x.set_name,
         };
     };
 
@@ -312,7 +356,7 @@ define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $
     if $key != none {
         let $table = select value id from only mindustry_profile where key = $key;
         if $table != none {
-            if fn::sus_update_obtain({ ip: $ip, isp: $isp }, 50) >= 2000 {
+            if fn::sus_update_obtain({ ip: $ip, isp: $isp }, 50) == 2 {
                 return { disabled: 12 };
             };
             return $process($table, false);
@@ -321,7 +365,7 @@ define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $
 
     let $table = select * from only type::record("mindustry_user", $uuid);
     if $table = none {
-        if fn::sus_update_obtain({ ip: $ip, isp: $isp }, 600) >= 2000 {
+        if fn::sus_update_obtain({ ip: $ip, isp: $isp }, 600) == 2 {
             return { disabled: 12 };
         };
 
@@ -331,7 +375,7 @@ define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $
 
         return $process_with_key($profile, true);
     } else {
-        if fn::sus_update_obtain({ ip: $ip, isp: $isp }, 50) >= 2000 {
+        if fn::sus_update_obtain({ ip: $ip, isp: $isp }, 50) == 2 {
             return { disabled: 12 };
         };
 

@@ -2,7 +2,6 @@ use std::{
     any::Any,
     collections::HashMap,
     ffi::{OsStr, OsString},
-    fs,
     io::{Write, stderr, stdin},
     ops::{Deref, DerefMut},
     path::PathBuf,
@@ -160,7 +159,12 @@ where
     /// This function is called after all targets have been initialized and the final parameters
     /// can be assembled. It's also called on inactive targets so even if a target is not
     /// explicitly enabled, it is kepts as a subproject in workspaces.
-    fn postinit(enabled: TargetEnabled, deps: Targets<'_>, params: &mut InitParams) {}
+    fn postinit(
+        #[allow(unused)] enabled: TargetEnabled,
+        #[allow(unused)] deps: Targets<'_>,
+        #[allow(unused)] params: &mut InitParams,
+    ) {
+    }
 }
 /// Extension trait for downcasting target implementations.
 #[allow(dead_code)]
