@@ -3083,7 +3083,6 @@ dependencies = [
 [[package]]
 name = "mindurka-rabbitmq-rust"
 version = "0.1.0"
-source = "git+https://github.com/Darkdustry-Coders/mindurka-rabbitmq-rust#1e070e6e99af6b5e3e4d3b0758167b9eb05cf054"
 dependencies = [
  "ciborium",
  "futures-lite",
@@ -3097,7 +3096,6 @@ dependencies = [
 [[package]]
 name = "mindurka-rabbitmq-rust-macro"
 version = "0.1.0"
-source = "git+https://github.com/Darkdustry-Coders/mindurka-rabbitmq-rust#1e070e6e99af6b5e3e4d3b0758167b9eb05cf054"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",

@@ -2,7 +2,6 @@ use ns "main" db "mindustry";
 
 define table if not exists object schemaless;
 insert ignore into object [
-    { id: "seq" },
     { id: "schema_version", value: 0 },
     { id: "graylist", mobile: false, hosting: false, proxy: true },
 ];
@@ -144,6 +143,8 @@ define field mobile on ip_info type bool;
 define field hosting on ip_info type bool;
 define field proxy on ip_info type bool;
 
+define sequence mindustry_profile_short_id_seq;
+
 define function fn::mindustry_fetch_user($search: string, $check_uuid: bool) {
     # TODO: Replace this with a proper int conversion.
     let $x = select * from only mindustry_profile where shortId != none && type::string(short_id) == $search;
@@ -266,10 +267,7 @@ define function fn::mindustry_update_profile($profile: record<mindustry_profile>
 } {
     let $new_short_id: option<int> = if $profile.short_id = none && ($profile.user.mindustry_permission_level > 0 ||
         $profile.play_time > 1h) {
-        let $short_id = select value short_id from only mindustry_profile order by short_id desc limit 1;
-        let $short_id = if $short_id = none { 0 } else { $short_id + 1 };
-        update only $profile set short_id = $short_id;
-        $short_id
+        update only $profile set short_id = sequence::nextval("mindustry_profile_short_id_seq") return value short_id;
     } else { none };
 
     # TODO: Ranks.
