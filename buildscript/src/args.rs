@@ -12,6 +12,7 @@ use crate::targets::TARGET_NAMES;
 pub enum MindustryVersion {
     BleedingEdge,
     #[default]
+    V156,
     V155,
     V154,
     V153,
@@ -22,12 +23,10 @@ pub enum MindustryVersion {
 impl FromStr for MindustryVersion {
     type Err = ();
 
-    /// Parses a Mindustry version string.
-    ///
-    /// Supported formats: "be", "v146", "v149", "v150", "v153", "v154", "v155"
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "be" => Ok(MindustryVersion::BleedingEdge),
+            "v156" => Ok(MindustryVersion::V156),
             "v155" => Ok(MindustryVersion::V155),
             "v154" => Ok(MindustryVersion::V154),
             "v153" => Ok(MindustryVersion::V153),

@@ -1,0 +1,6 @@
+allprojects {
+    repositories {
+        maven { url "https://mindurka.online/files/repo" }
+        MINDUSTRY_REPO
+    }
+}
