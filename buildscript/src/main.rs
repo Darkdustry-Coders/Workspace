@@ -149,6 +149,9 @@ fn main() {
                         args::MindustryVersion::V156 => r#"
                                                         library("mindustry", "Anuken", "Mindustry").version("v156")
                                                         "#,
+                        args::MindustryVersion::V157 => r#"
+                                                        library("mindustry", "Anuken", "Mindustry").version("v157")
+                                                        "#,
                         args::MindustryVersion::BleedingEdge => r#"
                                                                 library("mindustry", "Anuken", "MindustryBuilds").version("latest")
                                                                 "#,
@@ -162,6 +165,7 @@ fn main() {
                                                              bundle("mindustry", ["mindustry-arc", "mindustry-core", "mindustry-server"])
                                                              "#,
                              args::MindustryVersion::V156 |
+                             args::MindustryVersion::V157 |
                              args::MindustryVersion::BleedingEdge => r#"
                                                                      bundle("mindustry", ["mindustry"])
                                                                      "#,
@@ -179,7 +183,7 @@ fn main() {
                                                              maven { url 'https://jitpack.io' }
                                                              maven { url 'https://raw.githubusercontent.com/Zelaux/MindustryRepo/master/repository' }
                                                              "#,
-                             args::MindustryVersion::V156 => r#"
+                             args::MindustryVersion::V156 | args::MindustryVersion::V157 => r#"
                                                              ivy { url 'https://github.com/'
                                                                    patternLayout { artifact '/[organisation]/[module]/releases/download/[revision]/server-release.jar' }
                                                                    metadataSources { artifact() } }

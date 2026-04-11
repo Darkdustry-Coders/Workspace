@@ -70,6 +70,7 @@ impl TargetImplStatic for Impl {
             crate::args::MindustryVersion::V154 => "server-v154.jar",
             crate::args::MindustryVersion::V155 => "server-v155.jar",
             crate::args::MindustryVersion::V156 => "server-v156.jar",
+            crate::args::MindustryVersion::V157 => "server-v157.jar",
 
             crate::args::MindustryVersion::BleedingEdge => "server-be.jar",
         });
@@ -128,6 +129,15 @@ impl TargetImplStatic for Impl {
                 eprintln!("Downloading Mindustry (v156)");
                 download(
                     "https://github.com/Anuken/Mindustry/releases/download/v156/server-release.jar",
+                    file,
+                );
+                Self::new(fs::canonicalize(file).unwrap())
+            }
+            crate::args::MindustryVersion::V157 => {
+                let file = Path::new(".cache/tools/mindustry/server-v157.jar");
+                eprintln!("Downloading Mindustry (v157)");
+                download(
+                    "https://github.com/Anuken/Mindustry/releases/download/v157/server-release.jar",
                     file,
                 );
                 Self::new(fs::canonicalize(file).unwrap())
