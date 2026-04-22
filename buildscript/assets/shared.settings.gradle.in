@@ -26,7 +26,7 @@ dependencyResolutionManagement {
             library("kotlin-ksp", "com.google.devtools.ksp", "symbol-processing-api").version(kotlin)
             library("kotlin-coro", "org.jetbrains.kotlinx", "kotlinx-coroutines-core").version(kotlin_coro)
 
-            MINDUSTRY_PKGS
+            PKGS
 
             library("rabbitmq-amqp", "com.rabbitmq", "amqp-client").version(rabbitmq_aqmp)
             library("surrealdb", "net.buj", "SurrealRPC").version(surrealdb)
@@ -38,7 +38,7 @@ dependencyResolutionManagement {
 
             library("jansi", "org.fusesource.jansi", "jansi").version(jansi)
 
-            MINDUSTRY_BUNDLE
+            BUNDLES
             bundle("jline", ["jline-core", "jline-reader", "jline-terminal", "jline-jna"])
             bundle("kotlin-serialization", ["kotlin-json", "kotlin-cbor", "kotlin-toml-core", "kotlin-toml-source"])
         }

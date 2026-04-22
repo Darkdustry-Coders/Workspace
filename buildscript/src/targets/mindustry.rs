@@ -3,29 +3,20 @@
 //! This module manages Mindustry server JAR downloads and configuration.
 
 use std::{
-    fs::{self, File},
+    fs::{self, read_dir},
     path::{Path, PathBuf},
+    process::Command,
 };
 
-use crate::util::download;
+use crate::util::current_dir;
 
 use super::{TargetImpl, TargetImplStatic};
 
 /// Mindustry server target implementation.
 pub struct Impl {
-    /// Path to the server JAR file.
     path: PathBuf,
 }
-
 impl Impl {
-    /// Creates a new Mindustry target instance.
-    ///
-    /// # Arguments
-    /// * `path` - Path to the server JAR
-    fn new(path: PathBuf) -> Self {
-        Self { path }
-    }
-
     /// Returns the path to the server JAR.
     pub fn path(&self) -> &Path {
         &self.path
@@ -34,17 +25,55 @@ impl Impl {
 
 impl TargetImpl for Impl {
     fn build(&mut self, _: super::Targets<'_>, params: &mut super::BuildParams) {
-        params
-            .env
-            .insert("MINDUSTRY_PATH".into(), self.path.clone().into_os_string());
+        // If it works, it works. Just you wait till you learn how you UPDATE this thing.
+        if !params
+            .gradle()
+            .current_dir(fs::canonicalize("mindustry").unwrap())
+            .arg(":server:dist")
+            .arg("-Pbuildversion=157")
+            .arg(format!("-Pnativeimage={}", params.native_image))
+            .status()
+            .unwrap()
+            .success()
+        {
+            panic!("building Mindustry failed");
+        }
+
+        if !params
+            .gradle()
+            .current_dir(fs::canonicalize("arc").unwrap())
+            .arg("publishAllPublicationsToMavenRepository")
+            .status()
+            .unwrap()
+            .success()
+        {
+            panic!("publishing Arc failed");
+        }
+
+        fs::copy(
+            "mindustry/server/build/libs/server-release.jar",
+            ".bin/server-release.jar",
+        )
+        .unwrap();
+
+        // Build so nice I'll do it twice (otherwise server-release.jar has no shit).
+        if !params
+            .gradle()
+            .current_dir(fs::canonicalize("mindustry").unwrap())
+            .arg(":core:publishAllPublicationsToMavenRepository")
+            .arg(":server:publishAllPublicationsToMavenRepository")
+            .arg("-Pbuildversion=157")
+            .arg(format!("-Pnativeimage={}", params.native_image))
+            .status()
+            .unwrap()
+            .success()
+        {
+            panic!("building Mindustry failed");
+        }
     }
 }
 
 impl TargetImplStatic for Impl {
-    fn flags() -> super::TargetFlags {
-        super::TargetFlags::new().always_local()
-    }
-
     fn depends(list: &mut super::TargetList) {
         list.set_depend(super::Target::Java);
     }
@@ -60,25 +89,15 @@ impl TargetImplStatic for Impl {
     fn initialize_cached(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        params: &mut super::InitParams,
+        _: &mut super::InitParams,
     ) -> Option<Self> {
-        let file = Path::new(".cache/tools/mindustry").join(match params.mindustry_version {
-            crate::args::MindustryVersion::V146 => "server-v146.jar",
-            crate::args::MindustryVersion::V149 => "server-v149.jar",
-            crate::args::MindustryVersion::V150 => "server-v150.jar",
-            crate::args::MindustryVersion::V153 => "server-v153.jar",
-            crate::args::MindustryVersion::V154 => "server-v154.jar",
-            crate::args::MindustryVersion::V155 => "server-v155.jar",
-            crate::args::MindustryVersion::V156 => "server-v156.jar",
-
-            crate::args::MindustryVersion::BleedingEdge => "server-be.jar",
-        });
-
-        if File::open(&file).is_ok() {
-            Some(Self::new(fs::canonicalize(file).unwrap()))
-        } else {
-            None
+        if read_dir("mindustry").is_err() {
+            return None;
         }
+
+        Some(Self {
+            path: current_dir().join(".bin/server-release.jar"),
+        })
     }
 
     fn initialize_local(
@@ -86,55 +105,43 @@ impl TargetImplStatic for Impl {
         _: super::Targets<'_>,
         params: &mut super::InitParams,
     ) -> Self {
-        match params.mindustry_version {
-            crate::args::MindustryVersion::V146 => {
-                let file = Path::new(".cache/tools/mindustry/server-v146.jar");
-                eprintln!("Downloading Mindustry (v146)");
-                download(
-                    "https://github.com/5GameMaker/MindustryHotfixv7/releases/download/v146.8/server-release.jar",
-                    file,
-                );
-                Self::new(fs::canonicalize(file).unwrap())
-            }
-            crate::args::MindustryVersion::V153 => {
-                let file = Path::new(".cache/tools/mindustry/server-v153.jar");
-                eprintln!("Downloading Mindustry (v153)");
-                download(
-                    "https://github.com/Anuken/Mindustry/releases/download/v153/server-release.jar",
-                    file,
-                );
-                Self::new(fs::canonicalize(file).unwrap())
-            }
-            crate::args::MindustryVersion::V154 => {
-                let file = Path::new(".cache/tools/mindustry/server-v154.jar");
-                eprintln!("Downloading Mindustry (v154)");
-                download(
-                    "https://github.com/Anuken/Mindustry/releases/download/v154/server-release.jar",
-                    file,
-                );
-                Self::new(fs::canonicalize(file).unwrap())
-            }
-            crate::args::MindustryVersion::V155 => {
-                let file = Path::new(".cache/tools/mindustry/server-v155.jar");
-                eprintln!("Downloading Mindustry (v155)");
-                download(
-                    "https://github.com/Anuken/Mindustry/releases/download/v155.4/server-release.jar",
-                    file,
-                );
-                Self::new(fs::canonicalize(file).unwrap())
-            }
-            crate::args::MindustryVersion::V156 => {
-                let file = Path::new(".cache/tools/mindustry/server-v156.jar");
-                eprintln!("Downloading Mindustry (v156)");
-                download(
-                    "https://github.com/Anuken/Mindustry/releases/download/v156/server-release.jar",
-                    file,
-                );
-                Self::new(fs::canonicalize(file).unwrap())
-            }
-            _ => todo!(),
+        if !Command::new("git")
+            .arg("clone")
+            .arg(
+                params
+                    .git_backend
+                    .repo_url("Darkdustry-Coders/MindustryServer"),
+            )
+            .arg(params.root.join("mindustry"))
+            .status()
+            .unwrap()
+            .success()
+        {
+            panic!("failed to fetch repo");
+        }
+
+        if !Command::new("git")
+            .arg("clone")
+            .arg(params.git_backend.repo_url("Darkdustry-Coders/Arc"))
+            .arg(params.root.join("arc"))
+            .status()
+            .unwrap()
+            .success()
+        {
+            panic!("failed to fetch repo");
+        }
+
+        Self {
+            path: current_dir().join(".bin/server-release.jar"),
         }
     }
 
-    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, _: &mut super::InitParams) {}
+    fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, params: &mut super::InitParams) {
+        if fs::read_dir("mindustry").is_ok() {
+            params.java_masked_members.push("mindustry".into());
+        }
+        if fs::read_dir("arc").is_ok() {
+            params.java_masked_members.push("arc".into());
+        }
+    }
 }

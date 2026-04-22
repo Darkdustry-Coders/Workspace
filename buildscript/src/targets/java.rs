@@ -57,7 +57,7 @@ impl TargetImplStatic for Impl {
     fn initialize_host(
         _: super::TargetEnabled,
         _: super::Targets<'_>,
-        _: &mut super::InitParams,
+        params: &mut super::InitParams,
     ) -> Option<Self> {
         'a: {
             if let Ok(java_home) = std::env::var("JAVA_HOME") {
@@ -65,6 +65,12 @@ impl TargetImplStatic for Impl {
 
                 if !is_executable(java_home.join("bin/javac")) {
                     break 'a;
+                }
+
+                if params.native_image {
+                    if !is_executable(java_home.join("bin/native-image")) {
+                        break 'a;
+                    }
                 }
 
                 let Ok(out) = Command::new(java_home.join("bin/java"))
@@ -103,6 +109,12 @@ impl TargetImplStatic for Impl {
 
                     if !is_executable(java_home.join("bin/javac")) {
                         continue;
+                    }
+
+                    if params.native_image {
+                        if !is_executable(java_home.join("bin/native-image")) {
+                            continue;
+                        }
                     }
 
                     let Ok(out) = Command::new(java_home.join("bin/java"))

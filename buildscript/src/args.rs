@@ -7,42 +7,11 @@ use std::{collections::HashMap, path::PathBuf, process::exit, str::FromStr};
 
 use crate::targets::TARGET_NAMES;
 
-/// Supported Mindustry server versions.
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
-pub enum MindustryVersion {
-    BleedingEdge,
-    #[default]
-    V156,
-    V155,
-    V154,
-    V153,
-    V150,
-    V149,
-    V146,
-}
-impl FromStr for MindustryVersion {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "be" => Ok(MindustryVersion::BleedingEdge),
-            "v156" => Ok(MindustryVersion::V156),
-            "v155" => Ok(MindustryVersion::V155),
-            "v154" => Ok(MindustryVersion::V154),
-            "v153" => Ok(MindustryVersion::V153),
-            "v150" => Ok(MindustryVersion::V150),
-            "v149" => Ok(MindustryVersion::V149),
-            "v146" => Ok(MindustryVersion::V146),
-            _ => Err(()),
-        }
-    }
-}
-
 /// Command line parameters for build mode.
 #[derive(Default)]
 pub struct BuildArgs {
-    /// Target Mindustry version for the build.
-    pub mindustry_version: MindustryVersion,
+    /// Whether to use `native-image`.
+    pub native_image: bool,
     /// List of build targets to compile.
     pub targets: Vec<String>,
 
@@ -149,7 +118,7 @@ pub fn print_help() {
     eprintln!("\t--ssh              - use ssh instead of https when pulling repos");
     eprintln!();
     eprintln!("Extra params for build:");
-    eprintln!("\t--mindustry [VER]  - set mindustry version (v154 by default)");
+    eprintln!("\t--native           - build as a native image (may improve server performance)");
     eprintln!("\t--run              - run targets");
     eprintln!("\t--stacktrace       - pass '--stacktrace' to gradle");
     eprintln!("\t--server-ip [IP]   - set ip used for key authorization");
@@ -247,16 +216,8 @@ pub fn args() -> Args {
                         "stacktrace" => {
                             build.java_stackstrace = true;
                         }
-                        "mindustry" => {
-                            if let Some(x) = argv.next() {
-                                if let Ok(x) = MindustryVersion::from_str(&x) {
-                                    build.mindustry_version = x;
-                                } else {
-                                    errors.push(format!("--mindustry: invalid argument {x:?}"));
-                                }
-                            } else {
-                                errors.push("--mindustry: no value specified".to_string());
-                            }
+                        "native" => {
+                            build.native_image = true;
                         }
                         "server-ip" => {
                             if let Some(x) = argv.next() {
