@@ -1113,7 +1113,7 @@ macro_rules! simple_server_target {
 
                     params
                         .run
-                        .write(concat!($server, "/config/settings.bin"), contents);
+                        .write(concat!($dir, "/config/settings.bin"), contents);
                 }
 
                 if params.native_image {
