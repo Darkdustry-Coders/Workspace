@@ -1224,6 +1224,7 @@ targets! {
 
     hexed: Hexed;
     newtd: Newtd;
+    castle: Castle;
     mindurkabot: MindurkaBot;
     mindurkansfwdetector: MindurkaNsfwDetector;
 }
