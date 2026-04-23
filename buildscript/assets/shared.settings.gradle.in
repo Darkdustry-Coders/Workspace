@@ -8,7 +8,6 @@ dependencyResolutionManagement {
             def kotlin_coro = "1.10.2"
             def rabbitmq_aqmp = "5.26.0";
             def surrealdb = "0.5"
-            def mindustry = "MINDUSTRY_VERSION"
             def jline = "3.21.0"
             def jansi = "2.4.2"
 
@@ -27,9 +26,7 @@ dependencyResolutionManagement {
             library("kotlin-ksp", "com.google.devtools.ksp", "symbol-processing-api").version(kotlin)
             library("kotlin-coro", "org.jetbrains.kotlinx", "kotlinx-coroutines-core").version(kotlin_coro)
 
-            library("mindustry-arc", "MINDUSTRY_PKG_ARC", "arc-core").version(mindustry)
-            library("mindustry-core", "MINDUSTRY_PKG_MINDUSTRY", "core").version(mindustry)
-            library("mindustry-server", "MINDUSTRY_PKG_MINDUSTRY", "server").version(mindustry)
+            PKGS
 
             library("rabbitmq-amqp", "com.rabbitmq", "amqp-client").version(rabbitmq_aqmp)
             library("surrealdb", "net.buj", "SurrealRPC").version(surrealdb)
@@ -41,7 +38,7 @@ dependencyResolutionManagement {
 
             library("jansi", "org.fusesource.jansi", "jansi").version(jansi)
 
-            bundle("mindustry", ["mindustry-arc", "mindustry-core", "mindustry-server"])
+            BUNDLES
             bundle("jline", ["jline-core", "jline-reader", "jline-terminal", "jline-jna"])
             bundle("kotlin-serialization", ["kotlin-json", "kotlin-cbor", "kotlin-toml-core", "kotlin-toml-source"])
         }

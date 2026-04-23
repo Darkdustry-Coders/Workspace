@@ -1,0 +1,7 @@
+allprojects {
+    repositories {
+        maven { url "https://mindurka.online/files/repo" }
+        maven { url "file://WORKSPACE_PATH/.cache/maven" }
+        maven { url 'https://jitpack.io' }
+    }
+}

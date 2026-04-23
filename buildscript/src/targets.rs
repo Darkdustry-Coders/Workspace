@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    args::{BuildArgs, EnvTy, GitBackend, MindustryVersion},
+    args::{BuildArgs, EnvTy, GitBackend},
     syncfs::SyncFs,
     util::{self, current_dir},
 };
@@ -239,12 +239,14 @@ impl<'a, T> AsMut<T> for BorrowedMut<'a, T> {
 pub struct InitParams {
     /// Git backend for cloning repositories.
     pub git_backend: GitBackend,
-    /// Target Mindustry version.
-    pub mindustry_version: MindustryVersion,
+    /// Whether native builds are used.
+    pub native_image: bool,
     /// List of Rust workspace members to add.
     pub rust_workspace_members: Vec<String>,
     /// List of Java workspace members to add.
     pub java_workspace_members: Vec<String>,
+    /// List of Java workspace members to add (only when not running ./b).
+    pub java_masked_members: Vec<String>,
     /// Root path of the workspace.
     pub root: PathBuf,
     /// Whether RabbitMQ is hosted externally.
@@ -257,9 +259,10 @@ impl InitParams {
     pub fn new(args: &BuildArgs) -> Self {
         Self {
             git_backend: args.git_backend,
-            mindustry_version: args.mindustry_version,
+            native_image: args.native_image,
             rust_workspace_members: Default::default(),
             java_workspace_members: Default::default(),
+            java_masked_members: Default::default(),
             root: current_dir().to_path_buf(),
             host_rabbitmq: !args.rabbitmq_url.is_empty(),
             host_surrealdb: !args.surrealdb_url.is_empty(),
@@ -272,8 +275,8 @@ impl InitParams {
 pub struct BuildParams {
     /// Git backend for cloning repositories.
     pub git_backend: GitBackend,
-    /// Target Mindustry version.
-    pub mindustry_version: MindustryVersion,
+    /// Whether native builds are used.
+    pub native_image: bool,
     /// Environment variables to set during build.
     pub env: HashMap<OsString, OsString>,
     /// PATH directories for build commands.
@@ -292,7 +295,7 @@ impl BuildParams {
     pub fn new(params: InitParams, args: &BuildArgs) -> Self {
         Self {
             git_backend: params.git_backend,
-            mindustry_version: params.mindustry_version,
+            native_image: params.native_image,
             env: Default::default(),
             path: Default::default(),
             root: params.root,
@@ -309,7 +312,8 @@ impl BuildParams {
     ///
     /// It's recommended to always pass absolute paths to `cmd`
     /// as the requested application may not be available on `PATH`.
-    pub fn cmd(&mut self, cmd: impl AsRef<OsStr>) -> Command {
+    #[must_use]
+    pub fn cmd(&self, cmd: impl AsRef<OsStr>) -> Command {
         let mut cmd = Command::new(cmd);
         let mut path = OsString::with_capacity(
             self.path
@@ -331,7 +335,8 @@ impl BuildParams {
     }
 
     /// Creates a gradle command with appropriate wrapper.
-    pub fn gradle(&mut self) -> Command {
+    #[must_use]
+    pub fn gradle(&self) -> Command {
         let gradle = {
             #[cfg(unix)]
             {
@@ -350,7 +355,8 @@ impl BuildParams {
         cmd
     }
 
-    pub fn cargo(&mut self) -> Command {
+    #[must_use]
+    pub fn cargo(&self) -> Command {
         let cargo = util::find_executable_on_path("cargo", &self.path)
             .expect("Could not find cargo executable");
         self.cmd(cargo)
@@ -371,6 +377,8 @@ pub struct RunParams {
     pub host_rabbitmq: bool,
     /// Whether SurrealDB is hosted externally.
     pub host_surrealdb: bool,
+    /// Whether native builds are used.
+    pub native_image: bool,
 
     pub templates: HashMap<String, PathBuf>,
     pub run: SyncFs,
@@ -391,18 +399,21 @@ impl RunParams {
             host_rabbitmq: !args.rabbitmq_url.is_empty(),
             host_surrealdb: !args.surrealdb_url.is_empty(),
             templates: args.templates.clone(),
+            native_image: args.native_image,
             run,
         }
     }
 
     /// Returns the next available port and increments the counter.
+    #[must_use]
     pub fn next_port(&mut self) -> u16 {
         let port = self.port;
         self.port += 1;
         port
     }
 
-    pub fn cmd(&mut self, cmd: impl AsRef<OsStr>) -> Command {
+    #[must_use]
+    pub fn cmd(&self, cmd: impl AsRef<OsStr>) -> Command {
         let mut cmd = Command::new(cmd);
         let mut path = OsString::with_capacity(
             self.path
@@ -422,7 +433,9 @@ impl RunParams {
         cmd.env("PATH", path);
         cmd
     }
-    pub fn cargo(&mut self) -> Command {
+
+    #[must_use]
+    pub fn cargo(&self) -> Command {
         let cargo = util::find_executable_on_path("cargo", &self.path)
             .expect("Could not find cargo executable");
         self.cmd(cargo)
@@ -612,6 +625,577 @@ macro_rules! targets {
 
         /// Names of targets.
         pub const TARGET_NAMES: &[&str] = &[$(stringify!($name)),*];
+    };
+}
+
+macro_rules! simple_server_target {
+    (
+        jar = $jar:expr,
+        dir = $dir:expr,
+        target = $target:expr,
+        prefix = $prefix:expr,
+        server = $server:expr,
+        startcommand = $startcommand:expr,
+        repo = $repo:expr,
+
+        fn setup_server($setup_server_params:ident) $setup_server_body:expr,
+    ) => {
+        pub struct Impl {
+            /// Path to the plugin repository.
+            #[allow(unused)]
+            repo: ::std::path::PathBuf,
+            /// Path to the built JAR file.
+            #[allow(unused)]
+            path: ::std::path::PathBuf,
+            /// Command to run the server.
+            command: ::std::option::Option<::std::process::Command>,
+        }
+        impl Impl {
+            fn new(path: ::std::path::PathBuf) -> Self {
+                Self {
+                    repo: path,
+                    path: crate::current_dir().join(concat!(".bin/", $jar, ".jar")),
+                    command: None,
+                }
+            }
+        }
+        impl super::TargetImpl for Impl {
+            fn build(&mut self, deps: super::Targets<'_>, params: &mut super::BuildParams) {
+                // On Forts side it should copy resulting jar into `.bin/$jar.jar`.
+                if !params
+                    .gradle()
+                    .arg(concat!(":", $target, ":build"))
+                    .status()
+                    .unwrap()
+                    .success()
+                {
+                    panic!(concat!("building ", $jar, " failed"));
+                }
+
+                if params.native_image {
+                    println!("Merging jars! (will take a while!)");
+
+                    let mut output = zip::ZipWriter::new(
+                        ::std::fs::File::create(".cache/tools/buildscript/tmp.jar")
+                            .expect("failed to open '.cache/tools/buildscript/tmp.jar'"),
+                    );
+
+                    let mut buffer = vec![0; 1024 * 1024 * 16];
+
+                    {
+                        let mut input = zip::ZipArchive::new(
+                            ::std::fs::File::open(".bin/server-release.jar")
+                                .expect("failed to open '.bin/server-release.jar'"),
+                        )
+                        .expect("failed to open zip archive");
+                        for name in input
+                            .file_names()
+                            .map(|x| x.to_owned().into_boxed_str())
+                            .collect::<Vec<_>>()
+                        {
+                            if name.ends_with("/") {
+                                continue;
+                            }
+
+                            output
+                                .start_file(
+                                    &name,
+                                    ::zip::write::FileOptions::DEFAULT
+                                        .compression_method(zip::CompressionMethod::Deflated),
+                                )
+                                .unwrap();
+                            let mut reader = Some(input.by_name(&name).unwrap());
+                            let mut pos = 0usize;
+
+                            while pos != 0 || reader.is_some() {
+                                if pos < buffer.len() / 2 {
+                                    if let Some(x) = &mut reader {
+                                        match ::std::io::Read::read(x, &mut buffer[pos..]) {
+                                            Ok(0) => _ = reader.take(),
+                                            Ok(l) => pos += l,
+                                            Err(why) => {
+                                                panic!("Reading of {name:?} failed: {why:#?}")
+                                            }
+                                        }
+                                    }
+
+                                    if pos != 0 {
+                                        match ::std::io::Write::write(
+                                            &mut output,
+                                            &mut buffer[..pos],
+                                        ) {
+                                            Ok(0) => {
+                                                panic!(
+                                                    "Could not write into {name:?}: unexpected EOF"
+                                                )
+                                            }
+                                            Ok(l) => {
+                                                buffer.copy_within(l..pos, 0);
+                                                pos -= l;
+                                            }
+                                            Err(why) => {
+                                                panic!("Could not write into {name:?}: {why:#?}")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    for (name, prefix) in [
+                        (".bin/CorePlugin.jar", "coreplugin/"),
+                        (concat!(".bin/", $jar, ".jar"), concat!($prefix, "/")),
+                    ] {
+                        let mut input = ::zip::ZipArchive::new(match ::std::fs::File::open(name) {
+                            Ok(x) => x,
+                            Err(why) => panic!("failed to open {name:?}: {why:#?}"),
+                        })
+                        .expect("failed to open zip archive");
+                        for name in input
+                            .file_names()
+                            .map(|x| x.to_owned().into_boxed_str())
+                            .collect::<Vec<_>>()
+                        {
+                            if name.ends_with("/") {
+                                continue;
+                            }
+
+                            if &*name == "META-INF/MANIFEST.SF" {
+                                continue;
+                            }
+
+                            output
+                                .start_file(
+                                    if name.ends_with(".class")
+                                        || name.contains("kotlin")
+                                        || name.contains("native-image")
+                                        || name.contains("jline")
+                                    {
+                                        ::std::borrow::Cow::Borrowed(name.as_ref())
+                                    } else {
+                                        ::std::borrow::Cow::Owned(
+                                            String::from(prefix) + name.as_ref(),
+                                        )
+                                    }
+                                    .as_ref(),
+                                    ::zip::write::FileOptions::DEFAULT
+                                        .compression_method(zip::CompressionMethod::Deflated),
+                                )
+                                .unwrap();
+                            let mut reader = Some(input.by_name(&name).unwrap());
+                            let mut pos = 0usize;
+
+                            while pos != 0 || reader.is_some() {
+                                if pos < buffer.len() / 2 {
+                                    if let Some(x) = &mut reader {
+                                        match ::std::io::Read::read(x, &mut buffer[pos..]) {
+                                            Ok(0) => _ = reader.take(),
+                                            Ok(l) => pos += l,
+                                            Err(why) => {
+                                                panic!("Reading of {name:?} failed: {why:#?}")
+                                            }
+                                        }
+                                    }
+
+                                    if pos != 0 {
+                                        match ::std::io::Write::write(
+                                            &mut output,
+                                            &mut buffer[..pos],
+                                        ) {
+                                            Ok(0) => {
+                                                panic!(
+                                                    "Could not write into {name:?}: unexpected EOF"
+                                                )
+                                            }
+                                            Ok(l) => {
+                                                buffer.copy_within(l..pos, 0);
+                                                pos -= l;
+                                            }
+                                            Err(why) => {
+                                                panic!("Could not write into {name:?}: {why:#?}")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    output
+                        .start_file(
+                            "META-INF/mods",
+                            ::zip::write::FileOptions::DEFAULT
+                                .compression_method(zip::CompressionMethod::Stored),
+                        )
+                        .unwrap();
+                    ::std::io::Write::write_all(
+                        &mut output,
+                        concat!("coreplugin\n", $prefix).as_ref(),
+                    )
+                    .unwrap();
+
+                    output.finish().expect("failed to finish 'tmp.jar'");
+
+                    ::std::fs::remove_dir_all(".cache/tools/buildscript/genenv").ok();
+                    crate::fs2::create_dir_all(".cache/tools/buildscript/genenv/config").unwrap();
+
+                    crate::fs2::write(
+                        ".cache/tools/buildscript/genenv/config/corePlugin.toml",
+                        format!(
+                            "serverName = {:?}\ngamemode = {:?}\nsharedConfigPath = {:?}",
+                            $server, $server, "config/sharedConfig.toml"
+                        ),
+                    )
+                    .unwrap();
+                    crate::fs2::write(
+                        ".cache/tools/buildscript/genenv/config/sharedConfig.toml",
+                        "serverIp = \"127.0.0.1\"\nrabbitMqUrl=\"\"\nsurrealDbUrl=\"\"",
+                    )
+                    .unwrap();
+
+                    let code = params
+                        .cmd(
+                            deps.java
+                                .as_ref()
+                                .unwrap()
+                                .home()
+                                .join(crate::exe_path!("bin/java")),
+                        )
+                        .arg("-agentlib:native-image-agent=config-output-dir=.")
+                        .arg("-jar")
+                        .arg(crate::current_dir().join(".cache/tools/buildscript/tmp.jar"))
+                        .current_dir(crate::current_dir().join(".cache/tools/buildscript/genenv"))
+                        .spawn()
+                        .unwrap()
+                        .wait()
+                        .unwrap()
+                        .code()
+                        .unwrap_or(-1);
+                    if code != 0 {
+                        panic!("'java' exited with error code {code}");
+                    }
+
+                    let code = params
+                        .cmd(
+                            deps.java
+                                .as_ref()
+                                .unwrap()
+                                .home()
+                                .join(crate::exe_path!("bin/javac")),
+                        )
+                        .arg("buildscript/src/targets/NiMetadata.java")
+                        .arg("-d")
+                        .arg(".cache/tools/buildscript")
+                        .spawn()
+                        .unwrap()
+                        .wait()
+                        .unwrap()
+                        .code()
+                        .unwrap_or(-1);
+                    if code != 0 {
+                        panic!("'java' exited with error code {code}");
+                    }
+
+                    {
+                        // Because zip is fucking ass
+                        println!("Re-merging the archive! (will while take a)");
+
+                        let mut reader = zip::ZipArchive::new(
+                            ::std::fs::File::open(".cache/tools/buildscript/tmp.jar").unwrap(),
+                        )
+                        .unwrap();
+                        let mut writer = zip::ZipWriter::new(
+                            ::std::fs::File::create(".cache/tools/buildscript/tmp2.jar").unwrap(),
+                        );
+
+                        let names: Vec<_> = reader.file_names().map(String::from).collect();
+                        for name in names {
+                            if name.ends_with("/") {
+                                continue;
+                            }
+
+                            if name != "mindustry/NiMetadata.class" {
+                                writer
+                                    .raw_copy_file(reader.by_name(&name).unwrap())
+                                    .unwrap();
+                                continue;
+                            }
+
+                            let mut reader = Some(
+                                ::std::fs::File::open(
+                                    ".cache/tools/buildscript/mindustry/NiMetadata.class",
+                                )
+                                .unwrap(),
+                            );
+
+                            writer
+                                .start_file(
+                                    &name,
+                                    ::zip::write::FileOptions::DEFAULT
+                                        .compression_method(zip::CompressionMethod::Stored),
+                                )
+                                .unwrap();
+
+                            let mut pos = 0usize;
+
+                            while pos != 0 || reader.is_some() {
+                                if pos < buffer.len() / 2 {
+                                    if let Some(x) = &mut reader {
+                                        match ::std::io::Read::read(x, &mut buffer[pos..]) {
+                                            Ok(0) => _ = reader.take(),
+                                            Ok(l) => pos += l,
+                                            Err(why) => {
+                                                panic!("Reading of {name:?} failed: {why:#?}")
+                                            }
+                                        }
+                                    }
+
+                                    if pos != 0 {
+                                        match ::std::io::Write::write(
+                                            &mut writer,
+                                            &mut buffer[..pos],
+                                        ) {
+                                            Ok(0) => {
+                                                panic!(
+                                                    "Could not write into {name:?}: unexpected EOF"
+                                                )
+                                            }
+                                            Ok(l) => {
+                                                buffer.copy_within(l..pos, 0);
+                                                pos -= l;
+                                            }
+                                            Err(why) => {
+                                                panic!("Could not write into {name:?}: {why:#?}")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Ok(x) = ::std::fs::read_to_string(crate::current_dir().join(".cache/tools/buildscript/genenv/reachability-metadata.json")) {
+                            writer
+                                .start_file(
+                                    "META-INF/native-image/mindurka/workspace/reachability-metadata.json",
+                                    ::zip::write::FileOptions::DEFAULT
+                                        .compression_method(zip::CompressionMethod::Stored),
+                                )
+                                .unwrap();
+
+                            ::std::io::Write::write_all(&mut writer, x.as_bytes()).unwrap();
+                        }
+
+
+                        writer.finish().unwrap();
+                    }
+
+                    let code = {
+                        let mut cmd = params.cmd(
+                                deps.java
+                                    .as_ref()
+                                    .unwrap()
+                                    .home()
+                                    .join(crate::exe_path!("bin/native-image")),
+                            );
+                        cmd.arg("-jar")
+                            .arg(".cache/tools/buildscript/tmp2.jar")
+                            .arg("-H:IncludeResources=.*/lang/.*\\.l");
+                        if ::std::fs::File::open(crate::current_dir().join(".cache/tools/buildscript/genenv/reachability-metadata.json")).is_err() {
+                            cmd
+                                .arg(format!(
+                                    "-H:JNIConfigurationFiles={}",
+                                    crate::current_dir()
+                                        .join(".cache/tools/buildscript/genenv/jni-config.json")
+                                        .display()
+                                ))
+                                .arg(format!(
+                                    "-H:ResourceConfigurationFiles={}",
+                                    crate::current_dir()
+                                        .join(".cache/tools/buildscript/genenv/resource-config.json")
+                                        .display()
+                                ))
+                                .arg(format!(
+                                    "-H:ReflectionConfigurationFiles={},{}",
+                                    crate::current_dir()
+                                        .join(".cache/tools/buildscript/genenv/reflect-config.json")
+                                        .display(),
+                                    crate::current_dir()
+                                        .join("coreplugin/assets/reflect-config.json")
+                                        .display()
+                                ))
+                                .arg(format!(
+                                    "-H:SerializationConfigurationFiles={}",
+                                    crate::current_dir()
+                                        .join(".cache/tools/buildscript/genenv/serialization-config.json")
+                                        .display()
+                                ));
+                        } else {
+                            println!("\x1b[33m[WARN] 'reachability-metadata.json' is buggy af and thus not supported. Please use GraalVM 17\x1b[0m");
+                        }
+                        cmd.arg("--trace-class-initialization=kotlin.DeprecationLevel")
+                            .arg("-H:CStandard=C11")
+                            .arg("--initialize-at-build-time=kotlin.DeprecationLevel")
+                            .arg("--no-fallback")
+                            .arg("--enable-url-protocols=http")
+                            .arg("-o")
+                            .arg(crate::exe_path!(concat!(".bin/", $jar)))
+                            .spawn()
+                            .unwrap()
+                            .wait()
+                            .unwrap()
+                            .code()
+                            .unwrap_or(-1)
+                        };
+                    if code != 0 {
+                        panic!("'native-image' exited with error code {code}");
+                    }
+                }
+            }
+
+            fn run_init(&mut self, deps: super::Targets<'_>, mut params: &mut super::RunParams) {
+                let root = ::std::path::Path::new(concat!(".run/", $dir));
+
+                if !params.native_image {
+                    params.run.link_global(
+                        params.root.join(".bin/CorePlugin.jar"),
+                        concat!($dir, "/config/mods/CorePlugin.jar"),
+                    );
+                    params.run.link_global(
+                        params.root.join(concat!(".bin/", $jar, ".jar")),
+                        concat!($dir, "/config/mods/", $jar, ".jar"),
+                    );
+                }
+                params.run.write(
+                    concat!($dir, "/config/corePlugin.toml"),
+                    format!(
+                        "serverName = {:?}\ngamemode = {:?}\nsharedConfigPath = {:?}",
+                        $server,
+                        $server,
+                        params.root.join(".run/sharedConfig.toml")
+                    ),
+                );
+                {
+                    let $setup_server_params = &mut params;
+                    $setup_server_body;
+                }
+
+                let port = params.next_port();
+
+                {
+                    let mut contents = vec![];
+                    contents.extend_from_slice(&3i32.to_be_bytes());
+
+                    let option = "servername";
+                    contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(option.as_bytes());
+
+                    let name = concat!("[scarlet]Workspace [accent]| [white]", $jar);
+                    contents.push(4);
+                    contents.extend_from_slice(&(name.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(name.as_bytes());
+
+                    let option = "port";
+                    contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(option.as_bytes());
+
+                    contents.push(1);
+                    contents.extend_from_slice(&(port as i32).to_be_bytes());
+
+                    let option = "startCommands";
+                    contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(option.as_bytes());
+
+                    let commands = $startcommand;
+                    contents.push(4);
+                    contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(commands.as_bytes());
+
+                    params
+                        .run
+                        .write(concat!($dir, "/config/settings.bin"), contents);
+                }
+
+                if params.native_image {
+                    let mut cmd = params.cmd(
+                        std::fs::canonicalize(crate::exe_path!(concat!(".bin/", $jar))).unwrap(),
+                    );
+                    cmd.current_dir(root);
+                    self.command = Some(cmd);
+                } else {
+                    let java = deps.java.as_ref().unwrap().home().join("bin/java");
+                    let mindustry = deps.mindustry.as_ref().unwrap().path();
+
+                    let mut cmd = params.cmd(java);
+                    cmd.arg("-jar").arg(mindustry).current_dir(root);
+                    self.command = Some(cmd);
+                }
+            }
+
+            fn run(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
+                deps.mprocs.as_ref().unwrap().spawn_task(
+                    params,
+                    &mut self.command.take().unwrap(),
+                    $server,
+                );
+            }
+        }
+
+        impl super::TargetImplStatic for Impl {
+            fn depends(list: &mut super::TargetList) {
+                list.set_depend(super::Target::Java);
+                list.set_depend(super::Target::CorePlugin);
+            }
+
+            fn initialize_host(
+                _: super::TargetEnabled,
+                _: super::Targets<'_>,
+                _: &mut super::InitParams,
+            ) -> Option<Self> {
+                unimplemented!()
+            }
+
+            fn initialize_cached(
+                _: super::TargetEnabled,
+                _: super::Targets<'_>,
+                _: &mut super::InitParams,
+            ) -> Option<Self> {
+                if ::std::fs::read_dir($dir).is_err() {
+                    return None;
+                }
+
+                Some(Self::new(::std::fs::canonicalize($dir).unwrap()))
+            }
+
+            fn initialize_local(
+                _: super::TargetEnabled,
+                _: super::Targets<'_>,
+                params: &mut super::InitParams,
+            ) -> Self {
+                if !::std::process::Command::new("git")
+                    .arg("clone")
+                    .arg(params.git_backend.repo_url($repo))
+                    .arg(params.root.join($dir))
+                    .status()
+                    .unwrap()
+                    .success()
+                {
+                    panic!("failed to fetch repo");
+                }
+
+                Self::new(::std::fs::canonicalize($dir).unwrap())
+            }
+
+            fn postinit(
+                _: super::TargetEnabled,
+                _: super::Targets<'_>,
+                params: &mut super::InitParams,
+            ) {
+                if ::std::fs::read_dir($dir).is_ok() {
+                    params.java_workspace_members.push($dir.into());
+                }
+            }
+        }
     };
 }
 

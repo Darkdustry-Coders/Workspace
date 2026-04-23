@@ -17,6 +17,129 @@ use std::{
     process::Command,
 };
 
+use sha2::Digest;
+
+pub fn hash_files<P: AsRef<Path>>(roots: impl IntoIterator<Item = P>) -> [u8; 64] {
+    let mut buf = vec![0; 1024 * 1024 * 16];
+    let mut hash = sha2::Sha512::new();
+    for root in roots {
+        match fs::read_dir(root.as_ref()) {
+            Ok(x) => {
+                let mut stack = vec![x];
+                while let Some(head) = stack.last_mut() {
+                    match head.next() {
+                        Some(Ok(x)) => match fs::read_dir(x.path()) {
+                            Ok(x) => stack.push(x),
+                            Err(why) if why.kind() == io::ErrorKind::NotFound => (),
+                            Err(why) if why.kind() == io::ErrorKind::NotADirectory => {
+                                let mut file = match File::open(x.path()) {
+                                    Ok(x) => x,
+                                    Err(why) => {
+                                        panic!(
+                                            "Failed to calculate hash of {:?}: {why:#?}",
+                                            x.path().display()
+                                        )
+                                    }
+                                };
+                                hash.update(x.path().as_os_str().as_encoded_bytes());
+                                loop {
+                                    match file.read(&mut buf) {
+                                        Ok(0) => break,
+                                        Ok(l) => {
+                                            hash.update(&buf[..l]);
+                                        }
+                                        Err(why) => {
+                                            panic!(
+                                                "Failed to calculate hash of {:?}: {why:#?}",
+                                                x.path().display()
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Err(why) => {
+                                panic!(
+                                    "Failed to calculate hash of {:?}: {why:#?}",
+                                    x.path().display()
+                                )
+                            }
+                        },
+                        Some(Err(why)) => {
+                            panic!("readdir() failed: {why:#?}",)
+                        }
+                        None => _ = stack.pop(),
+                    }
+                }
+            }
+            Err(why) if why.kind() == io::ErrorKind::NotFound => (),
+            Err(why) if why.kind() == io::ErrorKind::NotADirectory => {
+                let mut file = match File::open(root.as_ref()) {
+                    Ok(x) => x,
+                    Err(why) => {
+                        panic!(
+                            "Failed to calculate hash of {:?}: {why:#?}",
+                            root.as_ref().display()
+                        )
+                    }
+                };
+                hash.update(root.as_ref().as_os_str().as_encoded_bytes());
+                loop {
+                    match file.read(&mut buf) {
+                        Ok(0) => break,
+                        Ok(l) => {
+                            hash.update(&buf[..l]);
+                        }
+                        Err(why) => {
+                            panic!(
+                                "Failed to calculate hash of {:?}: {why:#?}",
+                                root.as_ref().display()
+                            )
+                        }
+                    }
+                }
+            }
+            Err(why) => panic!(
+                "Failed to calculate hash of {:?}: {why:#?}",
+                root.as_ref().display()
+            ),
+        }
+    }
+    hash.finalize().into()
+}
+
+/// Remove extra whitespace.
+///
+/// ## Params
+/// **nws** - spaces to insert.
+pub fn strip_extras(s: impl AsRef<str>, nsw: usize) -> String {
+    let mut s = s.as_ref();
+
+    while s.starts_with('\n') {
+        s = &s[1..];
+    }
+    while s.ends_with('\n') {
+        s = &s[..s.len() - 1];
+    }
+
+    let strip = s
+        .lines()
+        .map(|x| x.chars().take_while(|x| *x != ' ').count())
+        .min()
+        .unwrap_or(0usize);
+
+    let spaces = " ".repeat(nsw);
+    let mut new_string = String::new();
+    for x in s.lines() {
+        if !new_string.is_empty() {
+            new_string.push('\n');
+        }
+        new_string.push_str(&spaces);
+        new_string.push_str(&x[strip..]);
+    }
+
+    new_string
+}
+
 /// Error that has a backtrace and an argument.
 pub struct Backtraced<E: DynError> {
     error: E,

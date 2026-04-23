@@ -10,7 +10,8 @@ xz = "0.1.0"
 
 [dependencies]
 # bzip2 = "0.6.0"
-dotenvy = "0.15.7"
 serde = { version = "1.0.228", features = ["derive"] }
 tera = "1.20.1"
 ureq = "3.0.12"
+sha2 = "0.11.0"
+zip = { version = "8.4.0", default-features = false, features = ["deflate"] }

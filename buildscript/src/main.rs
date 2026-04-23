@@ -6,7 +6,6 @@ mod util;
 
 use std::{
     borrow::Cow,
-    env::current_dir,
     fs,
     path::PathBuf,
     process::{Command, Stdio, exit},
@@ -17,14 +16,12 @@ use args::{Args, EnvTy};
 use targets::{BuildParams, InitParams, RunParams, TARGET_NAMES, Target, TargetList, Targets};
 use util::CURRENT_DIR;
 
-use crate::util::write_if_diff;
+use crate::util::{current_dir, strip_extras, write_if_diff};
 
 fn main() {
     unsafe {
-        CURRENT_DIR = Some(current_dir().unwrap());
+        CURRENT_DIR = Some(std::env::current_dir().unwrap());
     }
-
-    dotenvy::dotenv().ok();
 
     let args = args::args();
 
@@ -38,8 +35,8 @@ fn main() {
     }
 
     unsafe {
-        std::env::set_var("WORKSPACE", current_dir().unwrap());
-        std::env::set_var("MINDURKA_WORKSPACE", current_dir().unwrap());
+        std::env::set_var("WORKSPACE", current_dir());
+        std::env::set_var("MINDURKA_WORKSPACE", current_dir());
     };
 
     match args {
@@ -113,35 +110,36 @@ fn main() {
             targets.init_all(env, &mut recipe, &mut params);
             write_if_diff(
                 "buildscript/assets/shared.settings.gradle",
-                include_str!("../assets/shared.settings.gradle.in")
+                fs::read_to_string("buildscript/assets/shared.settings.gradle.in")
+                    .unwrap()
                     .replace(
-                        "MINDUSTRY_VERSION",
-                        match &build.mindustry_version {
-                            args::MindustryVersion::V146 => "v146.8",
-                            args::MindustryVersion::V149 => "v149",
-                            args::MindustryVersion::V150 => "v150",
-                            args::MindustryVersion::V153 => "v153",
-                            args::MindustryVersion::V154 => "v154",
-                            args::MindustryVersion::V155 => "v155",
-                            args::MindustryVersion::BleedingEdge => "v155",
-                        },
+                        "PKGS",
+                        &strip_extras(
+                            r#"
+                            library("mindustry-core", "anuken.mindustry", "core").version("release")
+                            library("mindustry-server", "anuken.mindustry", "server").version("release")
+                            library("arc-core", "anuken.arc", "arc-core").version("1.0")
+                            "#,
+                            12,
+                        ),
                     )
                     .replace(
-                        "MINDUSTRY_PKG_ARC",
-                        if build.mindustry_version == args::MindustryVersion::V146 {
-                            "com.github.5GameMaker.ArcV7"
-                        } else {
-                            "com.github.Anuken.Arc"
-                        },
-                    )
-                    .replace(
-                        "MINDUSTRY_PKG_MINDUSTRY",
-                        if build.mindustry_version == args::MindustryVersion::V146 {
-                            "com.github.5GameMaker.MindustryV7"
-                        } else {
-                            "com.github.Anuken.Mindustry"
-                        },
+                        "BUNDLES",
+                        &strip_extras(
+                            r#"
+                            bundle("mindustry", ["mindustry-core", "mindustry-server", "arc-core"])
+                            "#,
+                            12,
+                        ),
                     ),
+            )
+            .unwrap();
+            write_if_diff(
+                ".cache/tools/buildscript/shared.repos.gradle",
+                // TODO: Windows.
+                fs::read_to_string("buildscript/assets/shared.repos.gradle.in")
+                    .unwrap()
+                    .replace("WORKSPACE_PATH", current_dir().to_str().unwrap()),
             )
             .unwrap();
             write_if_diff(
@@ -160,8 +158,12 @@ fn main() {
             write_if_diff("settings.gradle", {
                 let mut s = String::new();
                 s += include_str!("../assets/settings.gradle.in");
+                s += "def inWorkspace = System.env['MINDURKA_WORKSPACE'] != null";
                 for x in &params.java_workspace_members {
                     s += &format!("\nincludeBuild '{x}'");
+                }
+                for x in &params.java_masked_members {
+                    s += &format!("\nif (!inWorkspace) includeBuild '{x}'");
                 }
                 s
             })

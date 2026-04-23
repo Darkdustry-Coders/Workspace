@@ -3,7 +3,7 @@
 //! This module manages SurrealDB installation.
 
 use std::{
-    fs,
+    fs::{self, File},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -21,6 +21,11 @@ static URL: &str = if cfg!(target_os = "linux") {
 } else {
     "https://github.com/surrealdb/surrealdb/releases/download/v3.0.1/surreal-v3.0.1.windows-amd64.exe"
 };
+
+static TRY_CAST_URL: &str = "https://mindurka.online/files/world-try-cast-1.0.0.surli";
+fn try_cast_file() -> &'static str {
+    TRY_CAST_URL.split('/').last().unwrap()
+}
 
 /// SurrealDB target implementation.
 pub struct Impl {
@@ -43,6 +48,19 @@ impl Impl {
     pub fn url(&self) -> String {
         format!("ws://admin:password@localhost:{}/main/mindustry", self.port)
     }
+
+    fn extras_init(params: &mut super::InitParams) {
+        let dest = params
+            .root
+            .join(".cache/tools/surrealdb")
+            .join(try_cast_file());
+        if File::open(&dest).is_ok() {
+            return;
+        }
+
+        println!("Downloading try_cast");
+        download(TRY_CAST_URL, dest);
+    }
 }
 
 impl TargetImpl for Impl {
@@ -59,9 +77,37 @@ impl TargetImpl for Impl {
         params.env.insert("SURREAL_USER".into(), "admin".into());
         params.env.insert("SURREAL_PASS".into(), "password".into());
         params.env.insert(
+            "SURREAL_CAPS_ALLOW_EXPERIMENTAL".into(),
+            "files,surrealism".into(),
+        );
+        params.env.insert(
+            "SURREAL_BUCKET_FOLDER_ALLOWLIST".into(),
+            params.root.join(".cache/tools/surrealdb").into(),
+        );
+        params.env.insert(
             "SURREAL_BIND".into(),
             format!("127.0.0.1:{}", self.port).into(),
         );
+
+        fs::write(
+            ".cache/tools/surrealdb/init.surrealql",
+            fs::read_to_string("sql/init.surrealql.in")
+                .unwrap()
+                .replace(
+                    "PLUGINS_BACKEND",
+                    &format!(
+                        "{:?}",
+                        "file://".to_string()
+                            + &fs::canonicalize(".cache/tools/surrealdb/")
+                                .unwrap()
+                                .to_string_lossy()
+                                .replace("\\", "/")
+                    ),
+                )
+                .replace("mod::try::", "type::try_"), // This one shouldn't be necessary, but it has
+                                                      // to be because surrealdb sucks.
+        )
+        .unwrap();
     }
 
     fn run(&mut self, mut deps: Targets<'_>, params: &mut RunParams) {
@@ -74,7 +120,7 @@ impl TargetImpl for Impl {
             Command::new(self.surreal.join(exe_path!("surreal")))
                 .arg("start")
                 .arg("--import-file")
-                .arg(fs::canonicalize("sql/init.surrealql").unwrap())
+                .arg(fs::canonicalize(".cache/tools/surrealdb/init.surrealql").unwrap())
                 .arg(format!(
                     "surrealkv://{}",
                     params.root.join(".run/surrealdb").to_str().unwrap()
@@ -105,7 +151,10 @@ impl TargetImplStatic for Impl {
         }
 
         let surreal = find_executable("surreal").map(|x| x.parent().unwrap().to_path_buf());
-        surreal.map(|surreal| Impl { surreal, port: 0 })
+        surreal.map(|surreal| Impl { surreal, port: 0 }).map(|x| {
+            Self::extras_init(params);
+            x
+        })
     }
 
     fn initialize_cached(
@@ -121,6 +170,7 @@ impl TargetImplStatic for Impl {
         }
 
         if is_executable(exe_path!(".cache/tools/surrealdb/surreal")) {
+            Self::extras_init(params);
             Some(Self {
                 surreal: fs::canonicalize(".cache/tools/surrealdb").unwrap(),
                 port: 0,
@@ -150,6 +200,8 @@ impl TargetImplStatic for Impl {
             untar_gz(archive, dir, 1);
             fs::remove_file(archive).ok();
 
+            Self::extras_init(params);
+
             return Self::new(fs::canonicalize(dir).unwrap());
         }
 
@@ -159,6 +211,8 @@ impl TargetImplStatic for Impl {
             let dir = Path::new(archive).parent().unwrap();
             fs::create_dir_all(dir).unwrap();
             download(URL, archive);
+
+            Self::extras_init(params);
 
             return Self::new(fs::canonicalize(dir).unwrap());
         }
