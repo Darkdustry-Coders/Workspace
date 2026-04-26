@@ -11,7 +11,7 @@ simple_server_target!(
     prefix = "castle",
     server = "castle-wars",
     startcommand = "host",
-    repo = "Darkdustry-Coders/CastleWarsV8",
+    repo = "Darkdustry-Coders/CastleWars",
 
     fn setup_server(params) {
         params.run.link_global(
