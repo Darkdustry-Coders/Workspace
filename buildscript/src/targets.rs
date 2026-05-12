@@ -71,7 +71,7 @@ impl Default for TargetFlags {
 }
 
 /// Build state of a target.
-#[derive(Default, PartialEq, Eq, Clone, Copy)]
+#[derive(Default, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 pub enum TargetEnabled {
     /// Target is disabled for this build.
     #[default]
@@ -1037,7 +1037,7 @@ macro_rules! simple_server_target {
                             .arg("-H:CStandard=C11")
                             .arg("--initialize-at-build-time=kotlin.DeprecationLevel")
                             .arg("--no-fallback")
-                            .arg("--enable-url-protocols=http")
+                            .arg("--enable-url-protocols=http,https")
                             .arg("-o")
                             .arg(crate::exe_path!(concat!(".bin/", $jar)))
                             .spawn()
@@ -1199,6 +1199,147 @@ macro_rules! simple_server_target {
     };
 }
 
+macro_rules! nil_plugin {
+    (
+        dir = $dir:expr,
+        server = $server:expr,
+        startcommand = $startcommand:expr,
+        servername = $servername:expr,
+
+        fn setup_server($setup_server_params:ident) $setup_server_body:expr,
+    ) => {
+        pub struct Impl {
+            command: ::std::option::Option<::std::process::Command>,
+        }
+        impl Impl {
+            fn new() -> Self {
+                Self { command: None }
+            }
+        }
+        impl super::TargetImpl for Impl {
+            fn build(&mut self, _: super::Targets<'_>, _: &mut super::BuildParams) {}
+
+            fn run_init(&mut self, deps: super::Targets<'_>, mut params: &mut super::RunParams) {
+                let root = ::std::path::Path::new(concat!(".run/", $dir));
+
+                if !params.native_image {
+                    params.run.link_global(
+                        params.root.join(".bin/CorePlugin.jar"),
+                        concat!($dir, "/config/mods/CorePlugin.jar"),
+                    );
+                    params.run.link_global(
+                        params.root.join(concat!(".bin/Nil.jar")),
+                        concat!($dir, "/config/mods/Nil.jar"),
+                    );
+                }
+                params.run.write(
+                    concat!($dir, "/config/corePlugin.toml"),
+                    format!(
+                        "serverName = {:?}\ngamemode = {:?}\nsharedConfigPath = {:?}",
+                        $server,
+                        $server,
+                        params.root.join(".run/sharedConfig.toml")
+                    ),
+                );
+                {
+                    let $setup_server_params = &mut params;
+                    $setup_server_body;
+                }
+
+                let port = params.next_port();
+
+                {
+                    let mut contents = vec![];
+                    contents.extend_from_slice(&3i32.to_be_bytes());
+
+                    let option = "servername";
+                    contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(option.as_bytes());
+
+                    let name = concat!("[scarlet]Workspace [accent]| [white]", $servername);
+                    contents.push(4);
+                    contents.extend_from_slice(&(name.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(name.as_bytes());
+
+                    let option = "port";
+                    contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(option.as_bytes());
+
+                    contents.push(1);
+                    contents.extend_from_slice(&(port as i32).to_be_bytes());
+
+                    let option = "startCommands";
+                    contents.extend_from_slice(&(option.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(option.as_bytes());
+
+                    let commands = $startcommand;
+                    contents.push(4);
+                    contents.extend_from_slice(&(commands.len() as u16).to_be_bytes());
+                    contents.extend_from_slice(commands.as_bytes());
+
+                    params
+                        .run
+                        .write(concat!($dir, "/config/settings.bin"), contents);
+                }
+
+                if params.native_image {
+                    let mut cmd = params
+                        .cmd(std::fs::canonicalize(crate::exe_path!(concat!(".bin/Nil"))).unwrap());
+                    cmd.current_dir(root);
+                    self.command = Some(cmd);
+                } else {
+                    let java = deps.java.as_ref().unwrap().home().join("bin/java");
+                    let mindustry = deps.mindustry.as_ref().unwrap().path();
+
+                    let mut cmd = params.cmd(java);
+                    cmd.arg("-jar").arg(mindustry).current_dir(root);
+                    self.command = Some(cmd);
+                }
+            }
+
+            fn run(&mut self, deps: super::Targets<'_>, params: &mut super::RunParams) {
+                deps.mprocs.as_ref().unwrap().spawn_task(
+                    params,
+                    &mut self.command.take().unwrap(),
+                    $server,
+                );
+            }
+        }
+        impl super::TargetImplStatic for Impl {
+            fn depends(list: &mut super::TargetList) {
+                list.set_depend(super::Target::Nil);
+            }
+
+            fn initialize_host(
+                _: super::TargetEnabled,
+                _: super::Targets<'_>,
+                _: &mut super::InitParams,
+            ) -> Option<Self> {
+                Some(Self::new())
+            }
+
+            fn initialize_cached(
+                _: super::TargetEnabled,
+                _: super::Targets<'_>,
+                _: &mut super::InitParams,
+            ) -> Option<Self> {
+                Some(Self::new())
+            }
+
+            fn initialize_local(
+                _: super::TargetEnabled,
+                _: super::Targets<'_>,
+                _: &mut super::InitParams,
+            ) -> Self {
+                Self::new()
+            }
+
+            fn postinit(_: super::TargetEnabled, _: super::Targets<'_>, _: &mut super::InitParams) {
+            }
+        }
+    };
+}
+
 targets! {
     /// Mprocs task runner.
     mprocs: MProcs;
@@ -1211,9 +1352,18 @@ targets! {
     surrealdb: SurrealDb;
     /// Mindustry server.
     mindustry: Mindustry;
+    /// RabbitMQ library for working with Mindurka.
+    mindurka_rabbitmq_rust: MindurkaRabbitMqRust;
 
     /// Java programming language.
     java: Java;
+
+    /// Discord/Telegram bot.
+    mindurkabot: MindurkaBot;
+    /// TODO.
+    mindurkansfwdetector: MindurkaNsfwDetector;
+    /// Mindurka's web server.
+    web: Web;
 
     /// Mindurka's core plugin.
     coreplugin: CorePlugin;
@@ -1221,9 +1371,19 @@ targets! {
     forts: Forts;
     /// Hub plugin.
     hub: Hub;
-
+    /// Hexed plugin.
     hexed: Hexed;
+    /// Newtd plugin.
     newtd: Newtd;
-    mindurkabot: MindurkaBot;
-    mindurkansfwdetector: MindurkaNsfwDetector;
+    /// Nil plugin.
+    nil: Nil;
+
+    /// Attack gamemode.
+    attack: Attack;
+    /// Survival gamemode.
+    survival: Survival;
+    /// Sandbox PvP gamemode.
+    spvp: SandboxPvP;
+    /// PvP gamemode.
+    pvp: PvP;
 }

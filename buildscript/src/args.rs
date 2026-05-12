@@ -3,7 +3,7 @@
 //! This module handles parsing of command line arguments for the buildscript,
 //! including build targets, environment settings, and various options.
 
-use std::{collections::HashMap, path::PathBuf, process::exit, str::FromStr};
+use std::{collections::HashMap, path::PathBuf, process::exit};
 
 use crate::targets::TARGET_NAMES;
 

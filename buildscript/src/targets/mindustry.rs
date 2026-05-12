@@ -50,11 +50,24 @@ impl TargetImpl for Impl {
             panic!("publishing Arc failed");
         }
 
-        fs::copy(
+        fs::rename(
             "mindustry/server/build/libs/server-release.jar",
-            ".bin/server-release.jar",
+            ".cache/tools/buildscript/server-release.jar",
         )
         .unwrap();
+
+        fs::remove_file(".bin/server-release.jar").ok();
+        if let Err(why) = fs::hard_link(
+            ".cache/tools/buildscript/server-release.jar",
+            ".bin/server-release.jar",
+        ) {
+            fs::copy(
+                ".cache/tools/buildscript/server-release.jar",
+                ".bin/server-release.jar",
+            )
+            .unwrap();
+            println!("[WARN] Failed to hard link server jar: {why:#?}");
+        }
 
         // Build so nice I'll do it twice (otherwise server-release.jar has no shit).
         if !params
@@ -107,11 +120,7 @@ impl TargetImplStatic for Impl {
     ) -> Self {
         if !Command::new("git")
             .arg("clone")
-            .arg(
-                params
-                    .git_backend
-                    .repo_url("Darkdustry-Coders/MindustryServer"),
-            )
+            .arg(params.git_backend.repo_url("Darkdustry-Coders/Mindustry"))
             .arg(params.root.join("mindustry"))
             .status()
             .unwrap()

@@ -8,17 +8,20 @@ define table if not exists object schemaless;
 insert ignore into object [
     { id: "schema_version", value: 0 },
     { id: "graylist", mobile: false, hosting: false, proxy: true },
+    { id: "graylist-isps", list: [] },
+    # This can't parse '/x' notation cuz I couldn't be assed.
+    { id: "graylist-ips", list: [] }
 ];
 
 let $schema_version = select value value from only object:schema_version;
 
-if $schema_version > 1 {
-    return "oh no";
+if $schema_version > 2 {
+    throw "oh no";
 };
 
 if $schema_version < 1 {
 
-define table if not exists user schemafull;
+define table user schemafull;
 # 0   - normal player
 # 100 - moderator (mute, kick, ban)
 # 200 - admin (map editing, artv, /stalk)
@@ -27,9 +30,6 @@ define table if not exists user schemafull;
 # No higher levels cuz technically access to /js or /sql already allows you to escalate to any permission level.
 # Higher permission levels can set others' permission levels
 define field mindustry_permission_level on user type int default 0;
-
-# TODO: Discord.
-# TODO: Telegram.
 
 define table if not exists sus_ip schemafull;
 define field id on sus_ip type string;
@@ -128,6 +128,11 @@ define field server_name on mindustry_ban type option<string>;
 define field reason on mindustry_ban type string;
 define field admin on mindustry_ban type option<record<user>>;
 define field pardoned on mindustry_ban type bool default false;
+# Ban kind, used for
+# 0 - Generic
+# 1 - Grief
+# 2 - Cheating
+define field kind on mindustry_ban type int default 0;
 
 define table mindustry_mute schemafull;
 define field user on mindustry_mute type record<user>;
@@ -155,9 +160,6 @@ define field id on mindustry_rank type string;
 define field prefix on mindustry_rank type string;
 define field requirements on mindustry_rank type option<object>;
 
-define table discord_user schemafull;
-define field user on discord_user type record<user>;
-
 define table ip_info schemafull;
 define field id on ip_info type string;
 define field expires on ip_info type datetime;
@@ -169,6 +171,48 @@ define field hosting on ip_info type bool;
 define field proxy on ip_info type bool;
 
 define sequence mindustry_profile_short_id_seq;
+
+define function fn::user_list_profiles($user: record<user>) -> {
+    mindustry: array<record<mindustry_profile>>,
+} { return {
+    mindustry: (select value id from (select * from mindustry_profile where user = $user)),
+};};
+
+define function fn::should_be_graylisted($ip: string) -> bool {
+    let $config = select *,
+                         (select value list from only object:`graylist-isps`) as isps,
+                         (select value list from only object:`graylist-ips`) as ips
+                  from only object:graylist;
+
+    if $config.isp.any(|$x| $ip.starts_with($x)) {
+        return true;
+    };
+
+    let $tables = select value id from only type::record("ip_info", $ip);
+    if $tables != none {
+        if $tables.mobile && $config.mobile {
+            return true;
+        };
+        if $tables.proxy && $config.proxy {
+            return true;
+        };
+        if $tables.hosting && $config.hosting {
+            return true;
+        };
+        if $config.isp.any(|$x| $x == $tables.isp) {
+            return true;
+        };
+    };
+
+    let $now = time::now();
+    let $banc = (select * from only mindustry_ban where !pardoned && (expires = none || expires > $now) && array::any(user->(logged where $now - last_used < 4w)->mindustry_ip, |$x| $x.id() = $ip)).len();
+    if $banc >= 10 || $tables != none && ($tables.mobile || $tables.hosting || $tables.proxy) && $banc >= 3 {
+        return true;
+    };
+
+    let $sus = fn::sus_update_obtain({ ip: $ip, isp: $tables.isp }, 0);
+    return $sus > 0;
+};
 
 define function fn::mindustry_fetch_user($search: string, $check_uuid: bool) {
     let $short_id = mod::try::int($search);
@@ -311,19 +355,6 @@ define function fn::rng_uuid_v7_nonum() -> uuid {
         };
     };
     return fn::rng_uuid_v7_nonum();
-};
-
-define function fn::mindustry_update_profile($profile: record<mindustry_profile>) -> {
-    new_short_id: option<int>,
-} {
-    let $new_short_id: option<int> = if $profile.short_id = none && ($profile.user.mindustry_permission_level > 0 ||
-        $profile.play_time > 1h) {
-        update only $profile set short_id = sequence::nextval("mindustry_profile_short_id_seq") return value short_id;
-    } else { none };
-
-    # TODO: Ranks.
-
-    return { new_short_id: $new_short_id };
 };
 
 define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $isp: option<string>,
@@ -592,4 +623,61 @@ create type::record("mindustry_gamemode", "zombies") content { display_name: "Zo
 
 };
 
-update only object:schema_version set value = 1;
+if $schema_version < 2 {
+
+define field link_code on user type option<string> default none;
+define field link_code_expires on user type datetime default time::now() - 1d;
+
+# Delete a user if nothing's referencing it.
+define function fn::gc_user($user: record<user>) {
+    if (select user from mindustry_profile where user = $user limit 1) != null { return none };
+    if (select user from discord_user where user = $user limit 1) != null { return none };
+
+    delete $user;
+};
+
+# List of channels to transfer messages between.
+define table linked_channel;
+# Display name.
+define field name on linked_channel type option<string> default none;
+# List of service addresses (service part only).
+define field links on linked_channel type array<string> default [];
+
+# Tags to be autoassigned to forums.
+define table discord_autoassign_tags;
+# Forum channel ID.
+define field id on discord_autoassign_tags type string;
+# Tag IDs.
+define field tags on discord_autoassign_tags type array<string>;
+
+define table discord_user;
+# Discord snowflake as an int.
+define field id on discord_user type int;
+define field user on discord_user type record<user>;
+
+define function fn::discord_fetch_user($id: int) -> record<discord_user> {
+    let $user = select value id from only type::record("discord_user", $id);
+    if $user != none { return $user };
+
+    let $user = create only user content { id: fn::rng_uuid_v7_nonum() } return value id;
+    let $profile = create only discord_user content { id: $id, user: $user } return value id;
+
+    return $profile;
+};
+
+define function overwrite fn::mindustry_update_profile($profile: record<mindustry_profile>) -> {
+    new_short_id: option<int>,
+} {
+    let $new_short_id: option<int> = if $profile.short_id = none && ($profile.user.mindustry_permission_level > 0 ||
+        $profile.play_time > 3h) {
+        update only $profile set short_id = sequence::nextval("mindustry_profile_short_id_seq") return value short_id;
+    } else { none };
+
+    # TODO: Ranks.
+
+    return { new_short_id: $new_short_id };
+};
+
+};
+
+update only object:schema_version set value = 2;

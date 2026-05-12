@@ -69,7 +69,6 @@ fn main() {
         }
         Args::Build { build, env } => {
             fs::remove_dir_all(".build").ok();
-            fs::remove_dir_all(".bin").ok();
             fs::create_dir_all(".bin").unwrap();
 
             let mut targets = Targets::default();

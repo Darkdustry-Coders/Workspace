@@ -1,0 +1,7 @@
+begin;
+
+# TODO: Delete old unused profiles if they don't have any important data associated.
+
+let $now = time::now();
+
+commit;
