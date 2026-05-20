@@ -76,7 +76,7 @@ impl TargetImpl for Impl {
                     r#"
                     shared_config_path = {:?}
                     "#,
-                    params.root.join("mindurka-bot/config.toml")
+                    params.root.join(".run/sharedConfig.toml")
                 ),
             );
         }
@@ -96,8 +96,8 @@ impl TargetImpl for Impl {
 
 impl TargetImplStatic for Impl {
     fn depends(list: &mut super::TargetList) {
-        list.set_depend(Target::RabbitMq);
         list.set_depend(Target::SurrealDb);
+        list.set_depend(Target::MindurkaRabbitMqRust);
     }
 
     fn initialize_host(

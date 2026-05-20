@@ -5,7 +5,7 @@
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, exit},
 };
 
 use crate::{
@@ -65,7 +65,40 @@ impl Impl {
 
 impl TargetImpl for Impl {
     fn build(&mut self, _: Targets<'_>, _: &mut super::BuildParams) {
-        // STUB: This target is not compiled from source.
+        fs::write(
+            ".cache/tools/surrealdb/init.surrealql",
+            fs::read_to_string("sql/init.surrealql.in")
+                .unwrap()
+                .replace(
+                    "PLUGINS_BACKEND",
+                    &format!(
+                        "{:?}",
+                        "file://".to_string()
+                            + &fs::canonicalize(".cache/tools/surrealdb/")
+                                .unwrap()
+                                .to_string_lossy()
+                                .replace("\\", "/")
+                    ),
+                )
+                .replace("mod::try::", "type::try_"), // This one shouldn't be necessary, but it has
+                                                                // to be because surrealdb sucks.
+        )
+        .unwrap();
+
+        // Maybe for a better time.
+        // let code = Command::new(self.surreal.join(exe_path!("surreal")))
+        //     .arg("validate")
+        //     .arg(".cache/tools/surrealdb/init.surrealql")
+        //     .env("SURREAL_CAPS_ALLOW_EXPERIMENTAL", "files,surrealism")
+        //     .spawn()
+        //     .unwrap()
+        //     .wait()
+        //     .unwrap()
+        //     .code()
+        //     .unwrap_or(-1);
+        // if code != 0 {
+        //     exit(1);
+        // }
     }
 
     fn run_init(&mut self, _: Targets<'_>, params: &mut RunParams) {
@@ -88,26 +121,6 @@ impl TargetImpl for Impl {
             "SURREAL_BIND".into(),
             format!("127.0.0.1:{}", self.port).into(),
         );
-
-        fs::write(
-            ".cache/tools/surrealdb/init.surrealql",
-            fs::read_to_string("sql/init.surrealql.in")
-                .unwrap()
-                .replace(
-                    "PLUGINS_BACKEND",
-                    &format!(
-                        "{:?}",
-                        "file://".to_string()
-                            + &fs::canonicalize(".cache/tools/surrealdb/")
-                                .unwrap()
-                                .to_string_lossy()
-                                .replace("\\", "/")
-                    ),
-                )
-                .replace("mod::try::", "type::try_"), // This one shouldn't be necessary, but it has
-                                                      // to be because surrealdb sucks.
-        )
-        .unwrap();
     }
 
     fn run(&mut self, mut deps: Targets<'_>, params: &mut RunParams) {
