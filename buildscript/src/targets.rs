@@ -1375,6 +1375,8 @@ targets! {
     hexed: Hexed;
     /// Newtd plugin.
     newtd: Newtd;
+    /// Castle Wars plugin.
+    castle: Castle;
     /// Nil plugin.
     nil: Nil;
 
