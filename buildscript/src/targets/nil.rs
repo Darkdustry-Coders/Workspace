@@ -392,7 +392,7 @@ impl super::TargetImpl for Impl {
                     .arg("-H:CStandard=C11")
                     .arg("--initialize-at-build-time=kotlin.DeprecationLevel")
                     .arg("--no-fallback")
-                    .arg("--enable-url-protocols=http")
+                    .arg("--enable-url-protocols=http,https")
                     .arg("-o")
                     .arg(crate::exe_path!(concat!(".bin/Nil")))
                     .spawn()

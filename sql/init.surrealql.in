@@ -254,7 +254,7 @@ define function fn::mindustry_fetch_user($search: string, $check_uuid: bool) {
             };
         };
     } else {
-        let $x = select * from only mindustry_profile where short_id != none && type::string(short_id) == $short_id;
+        let $x = select * from only mindustry_profile where short_id == $short_id;
         if $x != none {
             return {
                 name: $x.last_name,
