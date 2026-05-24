@@ -750,7 +750,7 @@ macro_rules! simple_server_target {
                         (concat!(".bin/", $jar, ".jar"), concat!($prefix, "/")),
                     ] {
                         let mut input = ::zip::ZipArchive::new(match ::std::fs::File::open(name) {
-                            Ok(x) => x,
+                            Ok(x) => ::std::io::BufReader::new(x),
                             Err(why) => panic!("failed to open {name:?}: {why:#?}"),
                         })
                         .expect("failed to open zip archive");

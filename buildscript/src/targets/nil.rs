@@ -38,16 +38,18 @@ impl super::TargetImpl for Impl {
             println!("Merging jars! (will take a while!)");
 
             let mut output = zip::ZipWriter::new(
-                ::std::fs::File::create(".cache/tools/buildscript/tmp.jar")
-                    .expect("failed to open '.cache/tools/buildscript/tmp.jar'"),
+                ::std::io::BufWriter::new(
+                    ::std::fs::File::create(".cache/tools/buildscript/tmp.jar")
+                        .expect("failed to open '.cache/tools/buildscript/tmp.jar'")),
             );
 
             let mut buffer = vec![0; 1024 * 1024 * 16];
 
             {
                 let mut input = zip::ZipArchive::new(
-                    ::std::fs::File::open(".bin/server-release.jar")
-                        .expect("failed to open '.bin/server-release.jar'"),
+                    ::std::io::BufReader::new(
+                        ::std::fs::File::open(".bin/server-release.jar")
+                            .expect("failed to open '.bin/server-release.jar'")),
                 )
                 .expect("failed to open zip archive");
                 for name in input
@@ -105,7 +107,7 @@ impl super::TargetImpl for Impl {
                 (".bin/Nil.jar", "nil/"),
             ] {
                 let mut input = ZipArchive::new(match File::open(name) {
-                    Ok(x) => x,
+                    Ok(x) => ::std::io::BufReader::new(x),
                     Err(why) => panic!("failed to open {name:?}: {why:#?}"),
                 })
                 .expect("failed to open zip archive");
@@ -254,11 +256,13 @@ impl super::TargetImpl for Impl {
                 println!("Re-merging the archive! (will while take a)");
 
                 let mut reader = zip::ZipArchive::new(
-                    ::std::fs::File::open(".cache/tools/buildscript/tmp.jar").unwrap(),
+                    ::std::io::BufReader::new(
+                        ::std::fs::File::open(".cache/tools/buildscript/tmp.jar").unwrap()),
                 )
                 .unwrap();
                 let mut writer = zip::ZipWriter::new(
-                    ::std::fs::File::create(".cache/tools/buildscript/tmp2.jar").unwrap(),
+                    ::std::io::BufWriter::new(
+                        ::std::fs::File::create(".cache/tools/buildscript/tmp2.jar").unwrap()),
                 );
 
                 let names: Vec<_> = reader.file_names().map(String::from).collect();
