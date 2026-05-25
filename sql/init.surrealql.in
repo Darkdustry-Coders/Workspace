@@ -434,8 +434,8 @@ if $schema_version < 3 {
 
 # Translator style.
 # 0 for disabled.
-define field translator_style on mindustry_profile type int default 1;
-define field skip_translation_of on mindustry_profile type array<string> default [];
+define field translator_style on mindustry_profile type option<int> default none;
+define field skip_translation_of on mindustry_profile type option<array<string>> default none;
 
 define function fn::mindustry_login_player_data(
     $muser: record<mindustry_user>,
@@ -453,8 +453,8 @@ define function fn::mindustry_login_player_data(
         permission_level: $user.mindustry_permission_level,
         set_name: $profile.set_name,
         confirmed: $confirmed,
-        translator_style: $profile.translator_style,
-        skip_translation_of: $profile.skip_translation_of,
+        translator_style: if $profile.translator_style = none { 1 } else { $profile.translator_style },
+        skip_translation_of: if $profile.skip_translation_of = none { [] } else { $profile.skip_translation_of },
     };
 };
 
