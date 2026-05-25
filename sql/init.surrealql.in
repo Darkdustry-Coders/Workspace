@@ -1,5 +1,7 @@
 use ns "main" db "mindustry";
 
+begin;
+
 define bucket if not exists plugins backend PLUGINS_BACKEND;
 define module if not exists mod::try as f"plugins:/world-try-cast-1.0.0.surli";
 mod::try::int("0");
@@ -357,10 +359,108 @@ define function fn::rng_uuid_v7_nonum() -> uuid {
     return fn::rng_uuid_v7_nonum();
 };
 
-define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $isp: option<string>,
+create type::record("mindustry_gamemode", "hub") content { display_name: "Hub", emoji: "", color: "white" };
+create type::record("mindustry_gamemode", "attack") content { display_name: "Attack", emoji: "", color: "scarlet" };
+create type::record("mindustry_gamemode", "castle-wars") content { display_name: "Castle Wars", emoji: "", color: "cyan" };
+create type::record("mindustry_gamemode", "crawler-arena") content { display_name: "Crawler Arena", emoji: "", color: "maroon" };
+create type::record("mindustry_gamemode", "forts") content { display_name: "Forts", emoji: "", color: "acid" };
+create type::record("mindustry_gamemode", "hexed-pvp") content { display_name: "Hexed PvP", emoji: "", color: "blue" };
+create type::record("mindustry_gamemode", "msgo") content { display_name: "MS:GO", emoji: "⚠", color: "#ff19ff" };
+create type::record("mindustry_gamemode", "pvp") content { display_name: "PvP", emoji: "", color: "blue" };
+create type::record("mindustry_gamemode", "sandbox") content { display_name: "Sandbox", emoji: "", color: "yellow" };
+create type::record("mindustry_gamemode", "sandbox-pvp") content { display_name: "Sandbox PvP", emoji: "", color: "#567DE2" };
+create type::record("mindustry_gamemode", "zombies") content { display_name: "Zombies", emoji: "", color: "purple" };
+
+}; # schema version 1
+
+if $schema_version < 2 {
+
+define field link_code on user type option<string> default none;
+define field link_code_expires on user type datetime default time::now() - 1d;
+
+# Delete a user if nothing's referencing it.
+define function fn::gc_user($user: record<user>) {
+    if (select user from mindustry_profile where user = $user limit 1) != null { return none };
+    if (select user from discord_user where user = $user limit 1) != null { return none };
+
+    delete $user;
+};
+
+# List of channels to transfer messages between.
+define table linked_channel;
+# Display name.
+define field name on linked_channel type option<string> default none;
+# List of service addresses (service part only).
+define field links on linked_channel type array<string> default [];
+
+# Tags to be autoassigned to forums.
+define table discord_autoassign_tags;
+# Forum channel ID.
+define field id on discord_autoassign_tags type string;
+# Tag IDs.
+define field tags on discord_autoassign_tags type array<string>;
+
+define table discord_user;
+# Discord snowflake as an int.
+define field id on discord_user type int;
+define field user on discord_user type record<user>;
+
+define function fn::discord_fetch_user($id: int) -> record<discord_user> {
+    let $user = select value id from only type::record("discord_user", $id);
+    if $user != none { return $user };
+
+    let $user = create only user content { id: fn::rng_uuid_v7_nonum() } return value id;
+    let $profile = create only discord_user content { id: $id, user: $user } return value id;
+
+    return $profile;
+};
+
+define function overwrite fn::mindustry_update_profile($profile: record<mindustry_profile>) -> {
+    new_short_id: option<int>,
+} {
+    let $new_short_id: option<int> = if $profile.short_id = none && ($profile.user.mindustry_permission_level > 0 ||
+        $profile.play_time > 3h) {
+        update only $profile set short_id = sequence::nextval("mindustry_profile_short_id_seq") return value short_id;
+    } else { none };
+
+    # TODO: Ranks.
+
+    return { new_short_id: $new_short_id };
+};
+
+}; # schema version 2
+
+if $schema_version < 3 {
+
+# Translator style.
+# 0 for disabled.
+define field translator_style on mindustry_profile type int default 1;
+define field skip_translation_of on mindustry_profile type array<string> default [];
+
+define function fn::mindustry_login_player_data(
+    $muser: record<mindustry_user>,
+    $confirmed: bool
+) -> object {
+    let $profile = $muser.profile;
+    let $user = $profile.user;
+    return {
+        user_id: record::id($user),
+        id: record::id($profile),
+        # rank: if $profile.rank = none { null } else { record::id($profile.rank) },
+        disabled: 0,
+        short_id: $profile.short_id,
+        key_set: $profile.key != none,
+        permission_level: $user.mindustry_permission_level,
+        set_name: $profile.set_name,
+        confirmed: $confirmed,
+        translator_style: $profile.translator_style,
+        skip_translation_of: $profile.skip_translation_of,
+    };
+};
+
+define function overwrite fn::mindustry_login($uuid: string, $usid: string, $ip: string, $isp: option<string>,
     $server: string, $key: option<bytes>, $new_name: string, $server_id: string,
 ) {
-
     let $tmp = select disabled from only type::record("mindustry_abandoned_user", $uuid);
     if $tmp != none {
         return $tmp;
@@ -369,6 +469,7 @@ define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $
     let $now = time::now();
 
     # TODO: Graylist.
+    # TODO: Move out all of this cuz this massive function is getting ridiculous.
 
     # Not cheap IP checks.
 
@@ -551,20 +652,24 @@ define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $
 
         let $usid_t = upsert only mindustry_usid content { usid: $usid, server_ip: $server_ip } return value id;
         let $logged_t = select value ->(logged where out = $usid_t)[0] from only $user;
-        let $logged_t = if $logged_t = none { relate $user->logged->$usid_t content { confirmed: false } } else { $logged_t };
+        let $logged_t = if $logged_t = none { relate only $user->logged->$usid_t content { confirmed: false } } else { $logged_t };
         update only $logged_t set last_used = time::now();
 
-        return {
-            user_id: record::id($x.user),
-            id: record::id($x),
-            # rank: if $x.rank = none { null } else { record::id($x.rank) },
-            disabled: 0,
-            short_id: $x.short_id,
-            key_set: $x.key != none,
-            permission_level: $x.user.mindustry_permission_level,
-            set_name: $x.set_name,
-            confirmed: if $x.key = none { $usid.confirmed } else { true },
-        };
+        return fn::mindustry_login_player_data(
+            $muser,                                              # muser
+            if $x.key = none { $logged_t.confirmed } else { true },  # confirmed
+        );
+        # return {
+        #     user_id: record::id($x.user),
+        #     id: record::id($x),
+        #     # rank: if $x.rank = none { null } else { record::id($x.rank) },
+        #     disabled: 0,
+        #     short_id: $x.short_id,
+        #     key_set: $x.key != none,
+        #     permission_level: $x.user.mindustry_permission_level,
+        #     set_name: $x.set_name,
+        #     confirmed: if $x.key = none { $usid.confirmed } else { true },
+        # };
     };
 
     let $process_with_key = |$user: record<mindustry_user>, $y: record<mindustry_profile>, $is_new: bool| {
@@ -609,75 +714,8 @@ define function fn::mindustry_login($uuid: string, $usid: string, $ip: string, $
     };
 };
 
-create type::record("mindustry_gamemode", "hub") content { display_name: "Hub", emoji: "", color: "white" };
-create type::record("mindustry_gamemode", "attack") content { display_name: "Attack", emoji: "", color: "scarlet" };
-create type::record("mindustry_gamemode", "castle-wars") content { display_name: "Castle Wars", emoji: "", color: "cyan" };
-create type::record("mindustry_gamemode", "crawler-arena") content { display_name: "Crawler Arena", emoji: "", color: "maroon" };
-create type::record("mindustry_gamemode", "forts") content { display_name: "Forts", emoji: "", color: "acid" };
-create type::record("mindustry_gamemode", "hexed-pvp") content { display_name: "Hexed PvP", emoji: "", color: "blue" };
-create type::record("mindustry_gamemode", "msgo") content { display_name: "MS:GO", emoji: "⚠", color: "#ff19ff" };
-create type::record("mindustry_gamemode", "pvp") content { display_name: "PvP", emoji: "", color: "blue" };
-create type::record("mindustry_gamemode", "sandbox") content { display_name: "Sandbox", emoji: "", color: "yellow" };
-create type::record("mindustry_gamemode", "sandbox-pvp") content { display_name: "Sandbox PvP", emoji: "", color: "#567DE2" };
-create type::record("mindustry_gamemode", "zombies") content { display_name: "Zombies", emoji: "", color: "purple" };
+}; # schema version 3
 
-};
+update only object:schema_version set value = 3;
 
-if $schema_version < 2 {
-
-define field link_code on user type option<string> default none;
-define field link_code_expires on user type datetime default time::now() - 1d;
-
-# Delete a user if nothing's referencing it.
-define function fn::gc_user($user: record<user>) {
-    if (select user from mindustry_profile where user = $user limit 1) != null { return none };
-    if (select user from discord_user where user = $user limit 1) != null { return none };
-
-    delete $user;
-};
-
-# List of channels to transfer messages between.
-define table linked_channel;
-# Display name.
-define field name on linked_channel type option<string> default none;
-# List of service addresses (service part only).
-define field links on linked_channel type array<string> default [];
-
-# Tags to be autoassigned to forums.
-define table discord_autoassign_tags;
-# Forum channel ID.
-define field id on discord_autoassign_tags type string;
-# Tag IDs.
-define field tags on discord_autoassign_tags type array<string>;
-
-define table discord_user;
-# Discord snowflake as an int.
-define field id on discord_user type int;
-define field user on discord_user type record<user>;
-
-define function fn::discord_fetch_user($id: int) -> record<discord_user> {
-    let $user = select value id from only type::record("discord_user", $id);
-    if $user != none { return $user };
-
-    let $user = create only user content { id: fn::rng_uuid_v7_nonum() } return value id;
-    let $profile = create only discord_user content { id: $id, user: $user } return value id;
-
-    return $profile;
-};
-
-define function overwrite fn::mindustry_update_profile($profile: record<mindustry_profile>) -> {
-    new_short_id: option<int>,
-} {
-    let $new_short_id: option<int> = if $profile.short_id = none && ($profile.user.mindustry_permission_level > 0 ||
-        $profile.play_time > 3h) {
-        update only $profile set short_id = sequence::nextval("mindustry_profile_short_id_seq") return value short_id;
-    } else { none };
-
-    # TODO: Ranks.
-
-    return { new_short_id: $new_short_id };
-};
-
-};
-
-update only object:schema_version set value = 2;
+commit;
