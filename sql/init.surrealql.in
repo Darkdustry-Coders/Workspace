@@ -656,7 +656,7 @@ define function overwrite fn::mindustry_login($uuid: string, $usid: string, $ip:
         update only $logged_t set last_used = time::now();
 
         return fn::mindustry_login_player_data(
-            $muser,                                              # muser
+            $muser,                                                  # muser
             if $x.key = none { $logged_t.confirmed } else { true },  # confirmed
         );
         # return {
