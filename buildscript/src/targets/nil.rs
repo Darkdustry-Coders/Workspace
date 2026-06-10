@@ -395,6 +395,7 @@ impl super::TargetImpl for Impl {
                 cmd.arg("--trace-class-initialization=kotlin.DeprecationLevel")
                     .arg("-H:CStandard=C11")
                     .arg("--initialize-at-build-time=kotlin.DeprecationLevel")
+                    .arg("--install-exit-handlers")
                     .arg("--no-fallback")
                     .arg("--enable-url-protocols=http,https")
                     .arg("-o")

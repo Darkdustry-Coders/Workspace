@@ -25,6 +25,7 @@ pub struct Impl {
     port: u16,
     /// Management plugin port number.
     management_port: u16,
+    command: Option<Command>,
 }
 
 impl Impl {
@@ -37,6 +38,7 @@ impl Impl {
             rabbitmq_home,
             port: 0,
             management_port: 0,
+            command: None,
         }
     }
 
@@ -78,31 +80,37 @@ impl TargetImpl for Impl {
             .write_all("[rabbitmq_management].".as_bytes())
             .unwrap();
         config.flush().unwrap();
+
+        if !params.host_rabbitmq {
+            let rabbitmq_root = &self.rabbitmq_home;
+
+            let use_sbin = is_executable(rabbitmq_root.join("sbin/rabbitmq-server"));
+
+            let mut command = Command::new(fs::canonicalize(rabbitmq_root
+                .join(if use_sbin { "sbin" } else { "bin" })
+                .join("rabbitmq-server")).unwrap());
+            command.arg(rabbitmq_root.join("start"));
+            command.env("RABBITMQ_CONFIG_FILE", rabbitmq_root.join("rabbitmq.conf"));
+            command.env(
+                "RABBITMQ_ENABLED_PLUGINS_FILE",
+                rabbitmq_root.join("enabled-plugins"),
+            );
+            command.env("RABBITMQ_PID_FILE", rabbitmq_root.join("rabbitmq.pid"));
+            command.env("RABBITMQ_LOG_BASE", rabbitmq_root.join("log"));
+            command.env("RABBITMQ_MNESIA_BASE", rabbitmq_root.join("db"));
+            command.env("RABBITMQ_MNESIA_DIR", rabbitmq_root.join("db"));
+
+            self.command = Some(command);
+        }
     }
 
     fn run(&mut self, mut deps: super::Targets<'_>, params: &mut super::RunParams) {
-        if params.host_rabbitmq {
-            return;
-        }
-
-        let rabbitmq_root = params.root.join(".run/rabbitmq");
-
-        let mut command = Command::new(self.rabbitmq_home.join("sbin").join("rabbitmq-server"));
-        command.arg(rabbitmq_root.join("start"));
-        command.env("RABBITMQ_CONFIG_FILE", rabbitmq_root.join("rabbitmq.conf"));
-        command.env(
-            "RABBITMQ_ENABLED_PLUGINS_FILE",
-            rabbitmq_root.join("enabled-plugins"),
-        );
-        command.env("RABBITMQ_PID_FILE", rabbitmq_root.join("rabbitmq.pid"));
-        command.env("RABBITMQ_LOG_BASE", rabbitmq_root.join("log"));
-        command.env("RABBITMQ_MNESIA_BASE", rabbitmq_root.join("db"));
-        command.env("RABBITMQ_MNESIA_DIR", rabbitmq_root.join("db"));
+        let Some(command) = self.command.as_mut() else { return; };
 
         deps.mprocs
             .as_mut()
             .unwrap()
-            .spawn_task(params, &mut command, "rabbitmq");
+            .spawn_task(params, command, "rabbitmq");
     }
 }
 
@@ -142,7 +150,7 @@ impl TargetImplStatic for Impl {
             return Some(Impl::new(PathBuf::new()));
         }
 
-        if is_executable(".cache/tools/rabbitmq/sbin/rabbitmq-server") {
+        if is_executable(".cache/tools/rabbitmq/sbin/rabbitmq-server") || is_executable(".cache/tools/rabbitmq/bin/rabbitmq-server") {
             Some(Self::new(
                 fs::canonicalize(".cache/tools/rabbitmq").unwrap(),
             ))
